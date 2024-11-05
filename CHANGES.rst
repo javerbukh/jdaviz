@@ -4,7 +4,7 @@
 New Features
 ------------
 
-* New design for viewer legend. [#3220]
+* New design for viewer legend. [#3220, #3254, #3263]
 
 Cubeviz
 ^^^^^^^
@@ -17,6 +17,8 @@ Mosviz
 
 Specviz
 ^^^^^^^
+- Specviz parser will now split a spectrum with a 2D flux array into multiple spectra on load
+  (useful for certain SDSS file types). [#3229]
 
 Specviz2d
 ^^^^^^^^^
@@ -44,6 +46,7 @@ Bug Fixes
 
 Cubeviz
 ^^^^^^^
+- Removed the deprecated ``save as fits`` option from the Collapse, Moment Maps, and Spectral Extraction plugins; use the Export plugin instead. [#3256]
 
 Imviz
 ^^^^^
@@ -68,10 +71,18 @@ Bug Fixes
 
 - Improved performance and removed jittering for the matched box zoom tool. [#3215]
 
+- Fixed Aperture Photometry radial profile fit crashing when NaN is present in
+  aperture data for Cubeviz and Imviz. [#3246]
+
+- Prevent PluginMarks from converting y-range so they maintain their position 
+  in the spectrum-viewer when spectral y units are converted. [#3242]
+
 Cubeviz
 ^^^^^^^
 
 - Add missing styling to API hints entry for aperture_method in the spectral extraction plugin. [#3231]
+
+- Fixed "spectrum at spaxel" tool so it no longer resets spectral axis zoom. [#3249]
 
 Imviz
 ^^^^^
@@ -253,16 +264,23 @@ Other Changes and Additions
 - Bump required specutils version to 1.16. Moment 0 calculation is now in units
   of flux*dx (rather than flux) [#3184]
 
-3.10.4 (unreleased)
+3.10.4 (2024-10-29)
 ===================
 
 Bug Fixes
 ---------
 
+- Stretch histogram in zoom limits no longer attempts unnecessary updates when zoom limits are changed. [#3151]
+
 Imviz
 ^^^^^
 
 - Remove "From File.." option when running on an external server. [#3239]
+
+Specviz2d
+^^^^^^^^^
+
+- Fix matched mouseover marker for 1d spectrum viewer when mouse is over 2d spectrum viewer. [#3203]
 
 3.10.3 (2024-07-22)
 ===================

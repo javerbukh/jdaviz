@@ -132,6 +132,7 @@ custom_components = {'j-tooltip': 'components/tooltip.vue',
                      'j-number-uncertainty': 'components/number_uncertainty.vue',
                      'j-plugin-popout': 'components/plugin_popout.vue',
                      'j-multiselect-toggle': 'components/multiselect_toggle.vue',
+                     'j-subset-icon': 'components/subset_icon.vue',
                      'plugin-previews-temp-disabled': 'components/plugin_previews_temp_disabled.vue',  # noqa
                      'plugin-table': 'components/plugin_table.vue',
                      'plugin-dataset-select': 'components/plugin_dataset_select.vue',
@@ -150,7 +151,8 @@ custom_components = {'j-tooltip': 'components/tooltip.vue',
                      'plugin-slider': 'components/plugin_slider.vue',
                      'plugin-color-picker': 'components/plugin_color_picker.vue',
                      'plugin-input-header': 'components/plugin_input_header.vue',
-                     'glue-state-sync-wrapper': 'components/glue_state_sync_wrapper.vue'}
+                     'glue-state-sync-wrapper': 'components/glue_state_sync_wrapper.vue',
+                     'data-menu-add-data': 'components/data_menu_add_data.vue'}
 
 _verbosity_levels = ('debug', 'info', 'warning', 'error')
 
@@ -206,7 +208,6 @@ class ApplicationState(State):
             'tray': True,
             'tab_headers': True,
         },
-        'viewer_labels': True,
         'dense_toolbar': True,
         'server_is_remote': False,  # sets some defaults, should be set before loading the config
         'context': {
