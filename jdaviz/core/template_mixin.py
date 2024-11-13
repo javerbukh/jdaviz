@@ -4903,7 +4903,11 @@ class Plot(PluginSubcomponent):
             ref_data = dc[0]
             links = [LinkSame(dc_entry.components[i], ref_data.components[i])
                      for i in range(1, len(ref_data.components))]
+            print("before", dc_entry, ref_data, len(dc.links))
+
             dc.add_link(links)
+            print("after tm", dc_entry, ref_data, len(dc.links))
+
         self.viewer.add_data(dc_entry)
 
         if broadcast:

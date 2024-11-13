@@ -564,6 +564,7 @@ class Application(VuetifyTemplate, HubListener):
                                       popup=msg_level >= popup_level)
 
     def _on_layers_changed(self, msg):
+        print("on_layers_changed", len(self.data_collection.links))
         if hasattr(msg, 'data'):
             layer_name = msg.data.label
             is_wcs_only = msg.data.meta.get(_wcs_only_label, False)
@@ -732,13 +733,15 @@ class Application(VuetifyTemplate, HubListener):
             ref_flux_component = dc[0].components[6]
             linked_wavelength_component = dc[-1].components[1]
             linked_flux_component = dc[-1].components[-1]
-
+            print("before", reference_data, data_to_be_linked, len(dc.links))
             links = [
                 LinkSameWithUnits(ref_wavelength_component, linked_wavelength_component),
                 LinkSame(ref_flux_component, linked_flux_component)
             ]
 
             dc.add_link(links)
+            print("after", reference_data, data_to_be_linked, len(dc.links))
+
             return
 
         elif (linked_data.meta.get('Plugin', None) == 'Spectral Extraction' or
@@ -2353,9 +2356,10 @@ class Application(VuetifyTemplate, HubListener):
             The Glue data collection add message containing information about
             the new data.
         """
+        print("data added", len(self.data_collection.links))
         # We don't need to link the first data to itself
-        if len(self.data_collection) > 1:
-            self._link_new_data()
+        # if len(self.data_collection) > 1:
+        self._link_new_data()
         data_item = self._create_data_item(msg.data)
         self.state.data_items.append(data_item)
 
