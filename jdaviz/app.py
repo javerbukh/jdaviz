@@ -1475,6 +1475,8 @@ class Application(VuetifyTemplate, HubListener):
             warnings.warn(f"Overwriting existing data entry with label '{data_label}'")
 
         self.data_collection[data_label] = data
+        print("add_data", len(self.data_collection.links))
+
 
         # manage associated Data entries:
         self._add_assoc_data_as_parent(data_label)
@@ -1643,6 +1645,7 @@ class Application(VuetifyTemplate, HubListener):
         viewer_item = self._get_viewer_item(viewer_reference)
         if viewer_item is None:
             raise ValueError(f"Could not identify viewer with reference {viewer_reference}")
+        print("add_data_to_viewer", len(self.data_collection.links))
 
         self.set_data_visibility(viewer_item, data_label, visible=visible, replace=clear_other_data)
 
@@ -2284,6 +2287,8 @@ class Application(VuetifyTemplate, HubListener):
             # for other configs in the future, as needed.
             if self.config == 'imviz':
                 viewer.on_limits_change()  # Trigger compass redraw
+        print("set_data_visibility", len(self.data_collection.links))
+
 
     def vue_data_item_remove(self, event):
 
@@ -2356,10 +2361,10 @@ class Application(VuetifyTemplate, HubListener):
             The Glue data collection add message containing information about
             the new data.
         """
-        print("data added", len(self.data_collection.links))
+        print("on_data_added app", len(self.data_collection.links))
         # We don't need to link the first data to itself
         # if len(self.data_collection) > 1:
-        self._link_new_data()
+        # self._link_new_data()
         data_item = self._create_data_item(msg.data)
         self.state.data_items.append(data_item)
 
