@@ -722,6 +722,7 @@ class Application(VuetifyTemplate, HubListener):
         linked_data = dc[data_to_be_linked] if data_to_be_linked else dc[-1]
 
         if 'Trace' in linked_data.meta:
+            print("trace")
             links = [LinkSame(linked_data.components[1], ref_data.components[0]),
                      LinkSame(linked_data.components[0], ref_data.components[1])]
             dc.add_link(links)
@@ -749,6 +750,7 @@ class Application(VuetifyTemplate, HubListener):
                  linked_data.ndim < 3 and  # Cube linking requires special logic. See below
                  ref_data.ndim < 3)
               ):
+            print("plugin")
             links = [LinkSame(linked_data.components[0], ref_data.components[0]),
                      LinkSame(linked_data.components[1], ref_data.components[1])]
             dc.add_link(links)
@@ -780,6 +782,8 @@ class Application(VuetifyTemplate, HubListener):
         # https://github.com/spacetelescope/jdaviz/pull/1412#discussion_r907630682
         len_linked_pixel = len(linked_data.pixel_component_ids)
 
+        print("before loop", len(dc.links))
+
         for ind, pixel_coord in enumerate(pc_ref):
             ref_index = ind
             if (len_linked_pixel == 2 and
@@ -807,6 +811,8 @@ class Application(VuetifyTemplate, HubListener):
                                            linked_data.pixel_component_ids[linked_index]))
 
         dc.add_link(links)
+        print("after loop", len(dc.links))
+
 
     def load_data(self, file_obj, parser_reference=None, **kwargs):
         """
@@ -2363,10 +2369,11 @@ class Application(VuetifyTemplate, HubListener):
         """
         print("on_data_added app", len(self.data_collection.links))
         # We don't need to link the first data to itself
-        # if len(self.data_collection) > 1:
-        # self._link_new_data()
+        if len(self.data_collection) > 1:
+            self._link_new_data()
         data_item = self._create_data_item(msg.data)
         self.state.data_items.append(data_item)
+        print("on_data_added app after", len(self.data_collection.links))
 
     def _clear_object_cache(self, data_label=None):
         if data_label is None:
