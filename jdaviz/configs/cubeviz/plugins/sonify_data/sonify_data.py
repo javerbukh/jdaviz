@@ -1,5 +1,6 @@
-from traitlets import Bool, List, Unicode, observe
+from traitlets import Unicode, Bool, List, Unicode, observe
 import astropy.units as u
+import os
 
 from jdaviz.core.custom_traitlets import IntHandleEmpty, FloatHandleEmpty
 from jdaviz.core.registries import tray_registry
@@ -24,6 +25,8 @@ except ImportError:
 else:
     _has_strauss = True
 
+# TODO: create this directory for stock sounds?
+SOUND_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'data', 'sounds')
 
 @tray_registry('cubeviz-sonify-data', label="Sonify Data")
 class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMixin,
@@ -54,11 +57,15 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
     stream_active = Bool(True).tag(sync=True)
     has_strauss = Bool(_has_strauss).tag(sync=True)
 
-    # TODO: can we referesh the list, so sounddevices are up-to-date when dropdown clicked?
+    # TODO: can we refresh the list, so sounddevices are up-to-date when dropdown clicked?
     sound_devices_items = List().tag(sync=True)
     sound_devices_selected = Unicode('').tag(sync=True)
 
     add_to_viewer_enabled = Bool(False).tag(sync=True)
+
+    # some addiional attributes for JS
+    first_sonification_done = Bool(False).tag(sync=True)
+    thisfile = Unicode(SOUND_DIR).tag(sync=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -110,7 +117,8 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
                                            self.pccut, self.audfrqmin,
                                            self.audfrqmax, self.eln, self.use_pccut,
                                            self.results_label)
-
+        self.first_sonification_done = True
+        
     @with_spinner()
     def vue_sonify_cube(self, *args):
         self.sonify_cube()

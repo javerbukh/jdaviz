@@ -157,3 +157,52 @@
       ></plugin-add-results>
  </j-tray-plugin>
 </template>
+
+<script>
+  // from the Sonify Plugin we can use the WebAudio API for detailed in-browser
+  // control over audio playback.
+  export default {
+    methods: {
+      handleSonifyClick() {
+	// multipurpose function on click - this writes to the browser JS console
+	console.log('Run Sonify Cube...')
+	this.sonify_cube(); // First render sonification...
+      },
+      async setupAudio() {
+	// two birds with one stone - as well as rendering the sonification, the browser
+	// can use the "Sonify Data" button press as the gesture your browser needs in-page
+	// before allowing browser playback...
+	console.log('Take clicking Sonify Data as gesture to initialise Audio Context...');
+	audioContext = await new (window.AudioContext || window.webkitAudioContext)();
+	await this.loadAudio();
+      },
+      async loadAudio() {
+        try {
+	  // Once sonified cube is rendered, for now just play coin sound as an affirmation
+	  // this sound is now being rendered by the browser (not streamed to a sound device by
+	  // python) so should be possible on platforms.
+          const response = await fetch('https://archive.org/download/Castle_2015102/Coin.mp3');
+          const arrayBuffer = await response.arrayBuffer();
+          audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+	  sourceNode = audioContext.createBufferSource();
+          sourceNode.buffer = audioBuffer;
+	  sourceNode.connect(audioContext.destination);
+          sourceNode.start(0);
+        } catch (error) {
+          console.error('Audio load error:', error);
+          throw error;
+        }
+      }
+    },
+    watch: {
+      first_sonification_done(newVal) {
+	// we wait for confirmation the cube has been rendered
+	if (newVal && this.first_sonification_done === true) {
+	  this.setupAudio();
+	  // reset flag so it triggers if we render again...
+	  this.first_sonification_done = false;
+	}
+      }
+    }
+  }
+</script>
