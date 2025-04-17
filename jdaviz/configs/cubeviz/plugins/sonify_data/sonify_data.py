@@ -2,6 +2,7 @@ from traitlets import Unicode, Bool, List, Unicode, observe
 import astropy.units as u
 import os
 
+from base64 import b64encode
 from jdaviz.core.custom_traitlets import IntHandleEmpty, FloatHandleEmpty
 from jdaviz.core.registries import tray_registry
 from jdaviz.core.template_mixin import (PluginTemplateMixin, DatasetSelectMixin,
@@ -60,6 +61,10 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
     sound_devices_items = List().tag(sync=True)
     sound_devices_selected = Unicode('').tag(sync=True)
 
+    # SFX
+    sound_in = Unicode('').tag(sync=True)
+    sound_out = Unicode('').tag(sync=True)
+    
     # some addiional attributes for JS
     first_sonification_done = Bool(False).tag(sync=True)
     thisfile = Unicode(SOUND_DIR).tag(sync=True)
@@ -81,6 +86,9 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         # TODO: Remove hardcoded range and flux viewer
         self.spec_viewer = self.app.get_viewer('spectrum-viewer')
         self.flux_viewer = self.app.get_viewer('flux-viewer')
+
+        # with open(os.path.join(SOUND_DIR, 'in.mp3')) as f:
+        #     self.sound_in = f"data:audio/mpeg;base64,{b64encode(f.read).decode('utf-8')}"
 
     @property
     def user_api(self):

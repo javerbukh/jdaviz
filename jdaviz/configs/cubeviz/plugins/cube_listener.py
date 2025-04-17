@@ -98,6 +98,7 @@ class CubeListenerData:
         self.cursig = np.zeros(self.siglen, dtype='int16')
         self.newsig = np.zeros(self.siglen, dtype='int16')
 
+        print(self.cube[:,:,0].size * self.siglen * 2 * pow(1024, -2))
         # ensure sigcube isn't too big before we initialise it
         if self.cube[:,:,0].size * self.siglen * 2 * pow(1024, -3) > 2:
             raise Exception("Cube projected to be > 2Gb!")
@@ -135,7 +136,7 @@ class CubeListenerData:
         self.cursig[:] = self.sigcube[self.idx1, self.idx2, :]
         self.newsig[:] = self.cursig[:]
         t1 = time.time()
-        print(f"Took {t1-t0}s to process {self.cube.shape[0]*self.cube.shape[1]} spaxels")
+        print(f"Took {t1-t0}s to process {self.cube.shape[0]*self.cube.shape[1]} spaxels for {self.cube.shape[0]*self.cube.shape[1]*self.sigcube.shape[-1] * 2 * pow(1024, -2)} Mb ({self.sigcube.shape[0]}x{self.sigcube.shape[1]}x{self.sigcube.shape[-1]})")
 
     def player_callback(self, outdata, frames, time, status):
         cur = self.cursig
