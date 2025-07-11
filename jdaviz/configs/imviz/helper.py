@@ -196,17 +196,9 @@ class Imviz(ImageConfigHelper):
                        parent=kwargs.pop('parent', None),
                        show_in_viewer=show_in_viewer)
         else:
-            # extensions is None or a single extension or data is NDData and importer will handle
-            # appending the extension
-            if isinstance(data, fits.hdu.image.ImageHDU):
-                if data_label is not None and not data_label.endswith(']'):
-                    # NOTE: for backwards compatibility with previous load_data behavior.
-                    # In .load() the data_label will not be appended
-                    data_label = data_label + f'[{data.name},{data.ver}]'
-
             # if the input is a HDUList, maintain previous behavior of appending
             # the extension, even if only a single extension is selected
-            data_label_as_prefix = isinstance(data, fits.HDUList)
+            data_label_as_prefix = isinstance(data, (fits.HDUList, fits.hdu.image.ImageHDU))
             self._load(data,
                        format='Image',
                        data_label=data_label,
