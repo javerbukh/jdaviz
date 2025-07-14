@@ -196,11 +196,12 @@ class Imviz(ImageConfigHelper):
                        parent=kwargs.pop('parent', None),
                        show_in_viewer=show_in_viewer)
         else:
-            # if the input is a HDUList/HDU and the data-label is provided but without an
+            # if the data-label is provided but without an
             # extension in the label, maintain previous behavior of appending
-            # the extension, even if only a single extension is selected
-            data_label_as_prefix = (isinstance(data, (fits.HDUList, fits.hdu.image.ImageHDU)) and
-                                    not data_label.endswith(']') and data_label is not None)
+            # the extension
+            data_label_as_prefix = (data_label is not None
+                                    and not data_label.endswith(']')
+                                    and getattr(data, 'meta', {}).get('plugin', None) is None)
             self._load(data,
                        format='Image',
                        data_label=data_label,
