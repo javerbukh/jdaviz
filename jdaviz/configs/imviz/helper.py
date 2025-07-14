@@ -202,6 +202,14 @@ class Imviz(ImageConfigHelper):
             data_label_as_prefix = (data_label is not None
                                     and not data_label.endswith(']')
                                     and getattr(data, 'meta', {}).get('plugin', None) is None)
+
+            if isinstance(data, fits.hdu.image.ImageHDU) and data_label_as_prefix:
+                # extensions are not handled by loaders for an ImageHDU
+                # TODO: move this logic into the image importer and treat it
+                # as an HDUList with a single extension
+                data_label = data_label + f'[{data.name},{data.ver}]'
+                data_label_as_prefix = False
+
             self._load(data,
                        format='Image',
                        data_label=data_label,
