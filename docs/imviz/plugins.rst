@@ -1,4 +1,4 @@
-.. _imviz_plugins:
+.. _imviz-plugins:
 
 *********************
 Data Analysis Plugins
@@ -12,7 +12,7 @@ icon in the upper right corner of the Imviz application.
     :alt: Imviz Plugins
     :width: 200px
 
-.. _imviz_metadata-viewer:
+.. _imviz-metadata-viewer:
 
 Metadata Viewer
 ===============
@@ -211,6 +211,35 @@ In Imviz, the table also exposes columns labeled "pixel:unreliable", "world:unre
 the bounds of the reference image's WCS (noted in the mouseover display by the information showing
 as grayed).
 
+.. _imviz_distance-tool:
+
+Distance Tool
+-------------
+
+The Markers plugin also includes a tool for measuring the distance and position angle between
+two points in a viewer. This functionality is available whenever the Markers plugin is open.
+
+
+1. Mouse over the desired start point in a viewer and press the ``d`` key. A ``...`` indicator
+   will appear in the :guilabel:`Last Measured Distance` field at the bottom of the plugin,
+   showing that the first point is set.
+2. Mouse over the desired end point and press the ``d`` key again.
+
+This will draw a line between the two points. A label showing the distance will appear,
+rotated to be parallel with the line, and offset to prevent intersecting the line.
+
+A new table, :guilabel:`Measurements`, will also appear below the main markers table. This
+table logs the start and end coordinates (both pixel and world, if available), the on-sky
+separation, the pixel distance, and the position angle for each measurement.
+
+**Additional Features:**
+
+* **Snapping**: To measure the distance from or to an existing marker, hold down the ``Alt`` key
+  (or ``Option`` on Mac) when you press ``d``. The tool will "snap" to the nearest marker
+  already in the main table.
+* **Clearing**: Pressing the ``r`` key will clear all markers from the main table *and* all
+  distance lines from the viewers.
+
 From the API
 ------------
 
@@ -316,7 +345,7 @@ and plots a radial profile for one object within
 an interactively selected region. A typical workflow is as follows:
 
 1. Load image(s) in Imviz (see :ref:`imviz-import-data`).
-2. Draw a region over the object of interest (see :ref:`imviz_defining_spatial_regions`).
+2. Draw a region over the object of interest (see :ref:`imviz-defining-spatial-regions`).
 3. Select the desired image using the :guilabel:`Data` dropdown menu.
 4. Select the desired region using the :guilabel:`Subset` dropdown menu.
    You can use the :ref:`imviz-subset-plugin` plugin to center it first on the
@@ -337,7 +366,7 @@ an interactively selected region. A typical workflow is as follows:
   * Subset: Define a region for background calculation (median) using Subset draw tool
     and select that region using the :guilabel:`Background` dropdown menu. Only regions
     created with the :guilabel:`replace` option are acceptable as background regions
-    (see :ref:`imviz_defining_spatial_regions`).
+    (see :ref:`imviz-defining-spatial-regions`).
 
    If your image is already background subtracted, choose "Manual" and set the
    :guilabel:`Background value` to 0.
@@ -391,7 +420,7 @@ an interactively selected region. A typical workflow is as follows:
 
 .. note::
 
-    The shape you see drawn from :ref:`imviz_defining_spatial_regions` is not
+    The shape you see drawn from :ref:`imviz-defining-spatial-regions` is not
     exactly the aperture mask being used by ``photutils``. This is because
     ``photutils`` uses fractional pixels and this is not reflected in the display.
 
@@ -414,7 +443,7 @@ results are displayed under the :guilabel:`CALCULATE` button.
 
 .. seealso::
 
-    :ref:`Export Photometry <imviz_export_photometry>`
+    :ref:`Export Photometry <imviz-export-photometry>`
         Documentation on exporting photometry results.
 
 .. _imviz-catalogs:
