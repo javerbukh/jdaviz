@@ -274,9 +274,8 @@ def _hdu2data(hdu, hdulist, include_wcs=True):
     data.meta.update(standardize_metadata(hdu.header))
     if include_wcs:
         if 'ASDF' in hdulist:  # if ASDF embedded in fits, there is a GWCS
-            data.coords = WCS(hdu.header, hdulist)
-            # from stdatamodels import asdf_in_fits
-            # data.coords = asdf_in_fits.open(hdulist).tree['meta']['wcs']
+            from stdatamodels import asdf_in_fits
+            data.coords = asdf_in_fits.open(hdulist).tree['meta']['wcs']
         else:  # otherwise, create FITS WCS from header
             data.coords = WCS(hdu.header, hdulist)
     component = Component.autotyped(hdu.data, units=bunit)
