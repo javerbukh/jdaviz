@@ -243,7 +243,7 @@ class ImageImporter(BaseImporterToDataCollection):
                 data_label = base_data_label
             print('add to data', output, data_label, parent)
             self.add_to_data_collection(output, data_label,
-                                        parent=parent if parent != data_label else None,
+                                        parent=parent if (parent != data_label and ext.lower() == 'dq') else None,
                                         show_in_viewer=show_in_viewer,
                                         cls=CCDData)
 

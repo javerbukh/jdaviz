@@ -1174,13 +1174,17 @@ class SelectPluginComponent(BasePluginComponent, HasTraits):
 
         default_empty = [] if self.is_multiselect else ''
         if self.default_mode == 'first':
-            print('in template mixin select', self.selected, self.labels, default_empty)
+            print('in template mixin select', self.selected, type(self.selected), is_valid)
+            print(self.labels)
+            print(default_empty, type(default_empty))
             self.selected = self.labels[0] if len(self.labels) else default_empty
+            print('after selected')
         elif self.default_mode == 'default_text':
             self.selected = self._default_text if self._default_text else default_empty
         else:
             self.selected = default_empty
         self._clear_cache(*self._cached_properties)
+        print('got here')
 
     def _is_valid_item(self, item, filter_callables={}):
         for valid_filter in self.filters:
@@ -1205,10 +1209,15 @@ class SelectPluginComponent(BasePluginComponent, HasTraits):
             self._apply_default_selection()
 
     def _selected_changed(self, event):
+        print('selected changed')
         self._selected_previous = event['old']
         self._clear_cache()
         valid = self.labels
+        print('selected changed 1')
+
         if self.is_multiselect:
+            print('selected changed 2')
+
             if not isinstance(event['new'], list):
                 self.selected = [event['new']]
                 return
@@ -1216,9 +1225,13 @@ class SelectPluginComponent(BasePluginComponent, HasTraits):
                 self.selected = event['old']
                 raise ValueError(f"not all items in {event['new']} are one of {valid}, reverting selection to {event['old']}")  # noqa
         else:
+            print('selected changed 3')
+
             if event['new'] not in valid + ['']:
                 self.selected = event['old']
                 raise ValueError(f"\'{event['new']}\' not one of {valid}, reverting selection to \'{event['old']}\'")  # noqa
+        print('selected changed 4')
+
 
 
 class SelectFileExtensionComponent(SelectPluginComponent):
