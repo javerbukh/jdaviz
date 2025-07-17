@@ -172,6 +172,7 @@ class ImageImporter(BaseImporterToDataCollection):
         return [_hdu2data(hdu, input) for hdu in self.extension.selected_hdu]
 
     def __call__(self, show_in_viewer=True):
+        print('in call')
         base_data_label = self.data_label_value
         # self.output is always a list of Data objects
         outputs = self.output
@@ -221,8 +222,9 @@ class ImageImporter(BaseImporterToDataCollection):
             parent = None
         else:
             parent = self.parent.selected
-
+        print('parent?')
         for output, ext, hdu in zip(outputs, exts, hdus):
+            print(output, ext, hdu)
             if output is None:
                 # needed for NDData where one of the "extensions" might
                 # not be present.  Remove this once users can select
@@ -239,6 +241,7 @@ class ImageImporter(BaseImporterToDataCollection):
             else:
                 # If data_label is not a prefix, we use it as is.
                 data_label = base_data_label
+            print('add to data', output, data_label, parent)
             self.add_to_data_collection(output, data_label,
                                         parent=parent if parent != data_label else None,
                                         show_in_viewer=show_in_viewer,
@@ -364,10 +367,11 @@ def _try_gwcs_to_fits_sip(gwcs):
 
 
 def prep_data_layer_as_dq(data):
+    print('in prep dq layer')
     # nans are used to mark "good" flags in the DQ colormap, so
     # convert DQ array to float to support nans:
     for component_id in data.main_components:
-        if component_id.label.startswith("DQ"):
+        if component_id.label.upper().startswith("DQ"):
             break
 
     cid = data.get_component(component_id)
@@ -404,6 +408,7 @@ def _roman_asdf_2d_to_glue_data(file_obj, ext=None, try_gwcs_to_fits_sip=False):
 
 
 def _jwst2data(hdu, hdulist, try_gwcs_to_fits_sip=False):
+    print('in jwst2data')
     comp_label = hdu.name.lower()
     if comp_label == 'sci':
         comp_label = 'data'
@@ -451,11 +456,12 @@ def _jwst2data(hdu, hdulist, try_gwcs_to_fits_sip=False):
     # TODO: Do not need this when jwst.datamodels finally its own package.
     # This might happen for grism image; fall back to FITS loader without WCS.
     except Exception:
+        print('in exception', comp_label, hdu.name)
         if comp_label == 'data':
-            new_ext = 'sci'
+            new_ext = 'SCI'
         else:
             new_ext = hdu.name
         new_hdu = hdulist[new_ext]
         return _hdu2data(new_hdu, hdulist, include_wcs=False)
-
+    print('got to end')
     return data

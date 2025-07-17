@@ -126,14 +126,23 @@ class BaseImporterToDataCollection(BaseImporter):
         self.resolver.import_disabled = len(self.data_label_invalid_msg) > 0
 
     def load_into_viewer(self, data_label, default_viewer_reference=None):
+        print("1")
         added = 0
         for viewer in self.app._jdaviz_helper.viewers.values():
+            print(viewer, data_label)
             if isinstance(viewer._obj, self.ignore_viewers_with_cls):
                 continue
             if data_label in viewer.data_menu.data_labels_unloaded:
                 added += 1
+                print("1.1")
                 viewer.data_menu.add_data(data_label)
+                print("1.2")
+
+        print("2")
+
         if added == 0:
+            print("3")
+
             if self.app.config not in ('deconfigged', 'lcviz'):
                 # do not add additional viewers
                 msg = SnackbarMessage(
@@ -141,21 +150,29 @@ class BaseImporterToDataCollection(BaseImporter):
                     color='error', sender=self, timeout=10000)
                 self.app.hub.broadcast(msg)
                 return
+            print("4")
+
             if default_viewer_reference is None:
                 default_viewer_reference = self.default_viewer_reference
                 default_viewer_label = self.default_viewer_label
             else:
                 default_viewer_label = vid_map.get(default_viewer_reference,
                                                    default_viewer_reference)
+            print("5")
+
             default_viewer_label = self.app.return_unique_name(default_viewer_label,
                                                                typ='viewer')
 
             viewer_dict = viewer_registry.members.get(default_viewer_reference)
             viewer_cls = viewer_dict.get('cls')
+            print("6")
+
             self.app._on_new_viewer(NewViewerMessage(viewer_cls, data=None, sender=self.app),
                                     vid=default_viewer_label,
                                     name=default_viewer_label,
                                     open_data_menu_if_empty=False)
+            print("7")
+
             viewer = self.app._jdaviz_helper.viewers.get(default_viewer_label)
             viewer.data_menu.add_data(data_label)
 
@@ -169,15 +186,19 @@ class BaseImporterToDataCollection(BaseImporter):
             except TypeError:
                 pass
         self.app.add_data(data, data_label=data_label)
+        print('in importer add to dc', parent)
         if parent is not None:
             self.app._set_assoc_data_as_child(data_label, parent)
+        print('finished adding parent')
         # store the original input class so that get_data can default to the
         # same class as the input
         cls = cls if cls is not None else data.__class__
         self.app.data_collection[data_label]._native_data_cls = cls
         self.app.data_collection[data_label]._importer = self.__class__.__name__
+        print('before show in viewer')
         if show_in_viewer:
             self.load_into_viewer(data_label)
+        print('after show in viewer')
 
     def __call__(self, show_in_viewer=True):
         if self.data_label_invalid_msg:

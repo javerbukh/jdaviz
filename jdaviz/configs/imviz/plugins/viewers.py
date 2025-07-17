@@ -284,6 +284,7 @@ class ImvizImageView(JdavizViewerMixin, BqplotImageView, AstrowidgetsImageViewer
             norm=norm))
 
     def set_plot_axes(self):
+        print('set plot axes')
         self.figure.axes[1].tick_format = None
         self.figure.axes[0].tick_format = None
 

@@ -511,6 +511,7 @@ class Application(VuetifyTemplate, HubListener):
             self.data_item_remove(data.label)
 
     def _on_add_data_message(self, msg):
+        print('on add data message')
         self._on_layers_changed(msg)
         self._update_live_plugin_results(trigger_data_lbl=msg.data.label)
 
@@ -643,11 +644,16 @@ class Application(VuetifyTemplate, HubListener):
                                       popup=msg_level >= popup_level)
 
     def _on_layers_changed(self, msg):
+        print('on layers changed')
         if hasattr(msg, 'data'):
+            print('if')
             layer_name = msg.data.label
             is_wcs_only = msg.data.meta.get(_wcs_only_label, False)
             is_not_child = self._get_assoc_data_parent(layer_name) is None
+            print('if 1')
             children_layers = self._get_assoc_data_children(layer_name)
+            print('if 2')
+
 
         elif hasattr(msg, 'subset'):
             # We don't need to reprocess the subset for every data collection entry
@@ -667,26 +673,40 @@ class Application(VuetifyTemplate, HubListener):
                              'North-up, East-right': 'nuer'}
 
         if layer_name not in self.state.layer_icons:
+            print(layer_name)
             if is_wcs_only:
                 self.state.layer_icons = {**self.state.layer_icons,
                                           layer_name: orientation_icons.get(layer_name,
                                                                             wcs_only_refdata_icon)}
             elif not is_not_child:
+                print("1")
                 parent_icon = self.state.layer_icons.get(self._get_assoc_data_parent(layer_name))
+                print("1.1")
+
                 index = len([ln for ln, ic in self.state.layer_icons.items()
                              if not ic[:4] == 'mdi-' and
                              self._get_assoc_data_parent(ln) == parent_icon]) + 1
+                print("1.2", layer_name, parent_icon, index)
+                print(self.state.layer_icons)
+
                 self.state.layer_icons = {
                     **self.state.layer_icons,
                     layer_name: f"{parent_icon}{index}"
                 }
+                print("2")
+
             else:
+                print("3")
+
                 self.state.layer_icons = {
                     **self.state.layer_icons,
                     layer_name: alpha_index(len([ln for ln, ic in self.state.layer_icons.items()
                                                  if not ic[:4] == 'mdi-' and
                                                  self._get_assoc_data_parent(ln) is None]))
                 }
+                print("4")
+
+        print("5")
 
         # all remaining layers at this point have a parent:
         child_layer_icons = {}
@@ -1817,6 +1837,7 @@ class Application(VuetifyTemplate, HubListener):
             Removes all other currently plotted data and only shows the newly
             defined data set.
         """
+        print('\t\t\tadd data to viewer')
         if ('mosviz_row' in self.state.settings and
             not (self.get_viewer(
                 self._jdaviz_helper._default_table_viewer_reference_name
@@ -2443,12 +2464,15 @@ class Application(VuetifyTemplate, HubListener):
         replace : bool
             Whether to disable the visibility of all other layers in the viewer
         """
+        print('set data visibility')
         viewer_item = self._get_viewer_item(viewer_reference)
         viewer_id = viewer_item['id']
         viewer = self.get_viewer_by_id(viewer_id)
 
         # if the data_label is in the app, but not loaded in the viewer, automatically load it first
         viewer_data_labels = [layer.layer.label for layer in viewer.layers]
+        print('set data visibility 1')
+
         if data_label not in viewer_data_labels:
             dc_labels = [data.label for data in self.data_collection]
             if data_label not in dc_labels:
@@ -2470,20 +2494,31 @@ class Application(VuetifyTemplate, HubListener):
             color = data.meta.get('_default_color')
             if color is None:
                 color = viewer.color_cycler()
+            print('set data visibility 2')
+
             viewer.add_data(data, percentile=95, color=color)
+            print('set data visibility 3')
 
             # Specviz removes the data from collection in viewer.py if flux unit incompatible.
             if data_label not in self.data_collection:
                 return
+            print('set data visibility 4')
 
             viewer.set_plot_axes()
+            print('set data visibility 4.1')
+            print(data, viewer, viewer_id)
+
+
 
             add_data_message = AddDataMessage(data, viewer,
                                               viewer_id=viewer_id,
                                               sender=self)
             self.hub.broadcast(add_data_message)
+            print('set data visibility 5')
 
         assoc_children = self._get_assoc_data_children(data_label)
+        print('set data visibility 6', assoc_children)
+
 
         # set visibility state of all applicable layers
         for layer in viewer.layers:
@@ -2512,6 +2547,7 @@ class Application(VuetifyTemplate, HubListener):
                 self.add_data_to_viewer(viewer.reference, child, visible=visible)
 
             if 'g-data-quality' in available_plugins and visible:
+                print('this if?', data_label)
                 # if we're adding a DQ layer to a viewer, make sure that
                 # the layer is appropriately colormapped as DQ:
                 data_quality_plugin = self.get_tray_item_from_name('g-data-quality')
@@ -2521,6 +2557,8 @@ class Application(VuetifyTemplate, HubListener):
                 data_quality_plugin.dq_layer_selected = child
                 data_quality_plugin.init_decoding(viewers=[viewer])
                 data_quality_plugin.viewer_selected = old_viewer
+                print('end this if?', data_label)
+
 
         for layer in viewer.layers:
             if layer.layer.data.label in assoc_children:

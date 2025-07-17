@@ -840,7 +840,6 @@ class BasePluginComponent(HubListener, ViewerPropertiesMixin, WithCache):
     def __setattr__(self, attr, value, force_super=False):
         if attr[0] == '_' or force_super or attr not in self._plugin_traitlets.keys():
             return super().__setattr__(attr, value)
-
         return setattr(self._plugin, self._plugin_traitlets.get(attr), value)
 
     def add_traitlets(self, **traitlets):
@@ -1175,6 +1174,7 @@ class SelectPluginComponent(BasePluginComponent, HasTraits):
 
         default_empty = [] if self.is_multiselect else ''
         if self.default_mode == 'first':
+            print('in template mixin select', self.selected, self.labels, default_empty)
             self.selected = self.labels[0] if len(self.labels) else default_empty
         elif self.default_mode == 'default_text':
             self.selected = self._default_text if self._default_text else default_empty

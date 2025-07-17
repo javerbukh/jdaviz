@@ -137,8 +137,11 @@ class DataQuality(PluginTemplateMixin, ViewerSelectMixin):
     @observe('science_layer_selected')
     def update_dq_layer(self, *args):
         if not hasattr(self, 'dq_layer'):
+
             return
 
+        print('in dq', self.dq_layer, self.science_layer_selected)
+        print('fails here!')
         self.dq_layer.filter_is_child_of = self.science_layer_selected
         self.dq_layer._update_items()
 

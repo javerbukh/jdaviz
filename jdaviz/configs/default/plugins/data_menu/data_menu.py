@@ -195,6 +195,7 @@ class DataMenu(TemplateMixin, LayerSelectMixin, DatasetSelectMixin):
         return self.dataset.choices
 
     def _set_viewer_id(self):
+        print('set viewer id')
         # viewer_ids are not populated on the viewer at init, so we'll keep checking and set
         # these the first time that they are available
         if len(self.viewer_id) and len(self.viewer_reference):
@@ -208,6 +209,7 @@ class DataMenu(TemplateMixin, LayerSelectMixin, DatasetSelectMixin):
         self._on_refdata_change()
 
     def _on_app_icons_updated(self, msg):
+        print('in app icons updated')
         if msg.icon_type == 'viewer':
             self.viewer_icons = msg.icons
         elif msg.icon_type == 'layer':
@@ -462,6 +464,7 @@ class DataMenu(TemplateMixin, LayerSelectMixin, DatasetSelectMixin):
         if len(unavailable):
             raise ValueError(f"Data labels {unavailable} not able to be loaded into '{self.viewer_id}'.  Must be one of: {self.dataset.choices}")  # noqa
         for data_label in data_labels:
+            print('\t\t', data_label)
             self.app.add_data_to_viewer(self.viewer_id, data_label)
 
     def vue_add_data_to_viewer(self, info, *args):
