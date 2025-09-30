@@ -141,24 +141,15 @@
         Overall Volume
         <glue-throttled-slider label="Volume" wait="300" max="100" step="1" :value.sync="volume" hide-details class="no-hint" />
     </v-row>
+    
     <j-plugin-section-header>Add Results Options</j-plugin-section-header>
-      <plugin-add-results
-          :label.sync="results_label"
-          :label_default="results_label_default"
-          :label_auto.sync="results_label_auto"
-          :label_invalid_msg="results_label_invalid_msg"
-          :label_overwrite="results_label_overwrite"
-          label_hint="Label for the sonified data"
-          :add_to_viewer_items="add_to_viewer_items"
-          :add_to_viewer_selected.sync="add_to_viewer_selected"
-          :add_to_viewer_enabled="false"
-          action_label="Sonify data"
-          action_tooltip="Create sonified data and add to flux viewer"
-          :action_spinner="spinner"
-          action_api_hint='plg.sonify_cube()'
-          :add_to_viewer_disabled="true"
-          @click:action="sonify_cube"
-      ></plugin-add-results>
+    <v-row>
+    </v-row>
+      <plugin-action-button
+        :spinner="spinner"
+        @click="handleSonifyClick"
+      > Sonify Data
+      </plugin-action-button>
  </j-tray-plugin>
 </template>
 
