@@ -16,17 +16,18 @@ __all__ = ['SonifyData']
 
 try:
     import strauss
-    import sounddevice as sd
     from scipy.io.wavfile import write as write_wav
+    _has_strauss = True
+except ImportError:
+    _has_strauss = False
+try:
+    import sounddevice as sd
 except ImportError:
     class Empty:
         pass
     sd = Empty()
     sd.default = Empty()
     sd.default.device = [-1, -1]
-    _has_strauss = False
-else:
-    _has_strauss = True
 
 # TODO: create this directory for stock sounds?
 SOUND_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'data', 'sounds')
