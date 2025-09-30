@@ -1,6 +1,7 @@
 from traitlets import Unicode, Bool, List, Unicode, observe
 import astropy.units as u
 import os
+from io import BytesIO
 
 from base64 import b64encode
 from jdaviz.core.custom_traitlets import IntHandleEmpty, FloatHandleEmpty
@@ -13,8 +14,9 @@ from jdaviz.core.user_api import PluginUserApi
 __all__ = ['SonifyData']
 
 try:
-    import strauss  # noqa
+    import strauss
     import sounddevice as sd
+    from scipy.io.wavfile import write as write_wav
 except ImportError:
     class Empty:
         pass
@@ -56,6 +58,7 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
     volume = IntHandleEmpty(100).tag(sync=True)
     stream_active = Bool(True).tag(sync=True)
     has_strauss = Bool(_has_strauss).tag(sync=True)
+    has_outs = Bool((sd.default.device[1] != -1)).tag(sync=True)
 
     # TODO: can we refresh the list, so sounddevices are up-to-date when dropdown clicked?
     sound_devices_items = List().tag(sync=True)
@@ -64,7 +67,8 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
     # SFX
     sound_in = Unicode('').tag(sync=True)
     sound_out = Unicode('').tag(sync=True)
-    
+    sonified_audio_data = Unicode('').tag(sync=True)
+
     # some addiional attributes for JS
     first_sonification_done = Bool(False).tag(sync=True)
     thisfile = Unicode(SOUND_DIR).tag(sync=True)
@@ -73,7 +77,7 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         super().__init__(*args, **kwargs)
         self._plugin_description = 'Sonify a data cube'
         self.docs_description = 'Sonify a data cube using the Strauss package.'
-        if not self.has_strauss or sd.default.device[1] < 0:
+        if not self.has_strauss:
             self.disabled_msg = ('To use Sonify Data, install strauss and restart Jdaviz. You '
                                  'can do this by running pip install strauss in the command'
                                  ' line and then launching Jdaviz. Currently, this plugin only'
@@ -101,8 +105,11 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
             raise ValueError('Unable to sonify cube')
 
         # Get index of selected device
-        selected_device_index = self.sound_device_indexes[self.sound_devices_selected]
-
+        if self.sound_devices_selected:
+            selected_device_index = self.sound_device_indexes[self.sound_devices_selected]
+        else:
+            selected_device_index = None
+            
         # Apply spectral subset bounds
         if self.spectral_subset_selected is not self.spectral_subset.default_text:
             display_unit = self.spec_viewer.state.x_display_unit
@@ -113,10 +120,17 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         # Ensure the current spectral region bounds are up-to-date at render time
         self.update_wavelength_range(None)
         # generate the sonified cube
-        self.flux_viewer.get_sonified_cube(self.sample_rate, self.buffer_size,
+        sonified_data = self.flux_viewer.get_sonified_cube(self.sample_rate, self.buffer_size,
                                            selected_device_index, self.assidx, self.ssvidx,
                                            self.pccut, self.audfrqmin,
                                            self.audfrqmax, self.eln, self.use_pccut)
+        
+        # In-memory WAV file
+        wav_buffer = BytesIO()
+        write_wav(wav_buffer, self.sample_rate, self.flux_viewer.sonified_cube.notification_sounds['on'].astype('int16'))
+        wav_buffer.seek(0)
+
+        self.sonified_audio_data = b64encode(wav_buffer.read()).decode('utf-8')
         self.first_sonification_done = True
 
     def vue_start_stop_stream(self, *args):
@@ -149,7 +163,10 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         devices, indexes = self.build_device_lists()
         self.sound_device_indexes = dict(zip(devices, indexes))
         self.sound_devices_items = devices
-        self.sound_devices_selected = dict(zip(indexes, devices))[sd.default.device[1]]
+        if len(devices) > 0:
+            self.sound_devices_selected = dict(zip(indexes, devices))[sd.default.device[1]]
+        else:
+            self.sound_devices_selected = ''
 
     def vue_refresh_device_list_in_dropdown(self, *args):
         self.refresh_device_list()

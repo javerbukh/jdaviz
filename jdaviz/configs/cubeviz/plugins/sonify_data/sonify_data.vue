@@ -14,6 +14,10 @@
       To use Sonify Data, install strauss and restart Jdaviz. You can do this by running pip install strauss
       in the command line and then launching Jdaviz.
     </v-alert>
+    <v-row v-if="has_strauss && !has_outs">
+      <j-docs-link>Sonification on platforms is under construction, and will be silent for now.</j-docs-link>
+    </v-row>
+
     <v-row>
       <j-docs-link>Choose the input cube, spectral subset and any advanced sonification options.</j-docs-link>
     </v-row>
@@ -162,44 +166,54 @@
   export default {
     methods: {
       handleSonifyClick() {
-	// multipurpose function on click - this writes to the browser JS console
-	console.log('Run Sonify Cube...')
-	this.sonify_cube(); // First render sonification...
-      },
-      async setupAudio() {
-	// two birds with one stone - as well as rendering the sonification, the browser
-	// can use the "Sonify Data" button press as the gesture your browser needs in-page
-	// before allowing browser playback...
-	console.log('Take clicking Sonify Data as gesture to initialise Audio Context...');
-	audioContext = await new (window.AudioContext || window.webkitAudioContext)();
-	await this.loadAudio();
+        // multipurpose function on click - this writes to the browser JS console
+        console.log('Run Sonify Cube...')
+        if (!this.audioContext) {
+          console.log('Creating AudioContext...');
+          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        this.sonify_cube(); // First render sonification...
       },
       async loadAudio() {
         try {
-	  // Once sonified cube is rendered, for now just play coin sound as an affirmation
-	  // this sound is now being rendered by the browser (not streamed to a sound device by
-	  // python) so should be possible on platforms.
-          const response = await fetch('https://archive.org/download/Castle_2015102/Coin.mp3');
-          const arrayBuffer = await response.arrayBuffer();
-          audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-	  sourceNode = audioContext.createBufferSource();
-          sourceNode.buffer = audioBuffer;
-	  sourceNode.connect(audioContext.destination);
-          sourceNode.start(0);
+          // Once sonified cube is rendered, for now just play coin sound as an affirmation
+          // this sound is now being rendered by the browser (not streamed to a sound device by
+          // python) so should be possible on platforms.
+          console.log('New audio data incoming...')
+          const arrayBuffer = this.sonified_audio_data_str.buffer;
+          this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+          // 1. Create a GainNode to control volume
+          const gainNode = this.audioContext.createGain();
+          gainNode.gain.value = 0.5; 
+          gainNode.connect(this.audioContext.destination);
+          
+          this.sourceNode = this.audioContext.createBufferSource();
+          this.sourceNode.buffer = this.audioBuffer;
+          this.sourceNode.connect(gainNode);
+          this.sourceNode.start(0);
         } catch (error) {
-          console.error('Audio load error:', error);
-          throw error;
+            console.error('Audio load error:', error);
+            throw error;
         }
       }
     },
     watch: {
-      first_sonification_done(newVal) {
-	// we wait for confirmation the cube has been rendered
-	if (newVal && this.first_sonification_done === true) {
-	  this.setupAudio();
-	  // reset flag so it triggers if we render again...
-	  this.first_sonification_done = false;
-	}
+      sonified_audio_data(newVal) {
+        if (newVal) {
+          this.loadAudio();
+        }
+      }
+    },
+    computed: {
+      sonified_audio_data_str() {
+        const binary_string = window.atob(this.sonified_audio_data);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes;
       }
     }
   }

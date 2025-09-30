@@ -8,7 +8,7 @@ try:
     from strauss.sonification import Sonification
     from strauss.sources import Events
     from strauss.score import Score
-    from strauss.generator import Spectralizer
+    from strauss.generator import Spectralizer, Synthesizer
 except ImportError:
     pass
 
@@ -27,7 +27,49 @@ def suppress_stderr():
         finally:
             sys.stderr = old_stderr
 
+def make_notification_sounds(srate=44100, duration=0.5):
+    # fifth interval - commonly evokes 'ready'
+    notes = [["E3", "B3", "E4"]]
+    score = Score(notes, duration)
+    generator = Synthesizer(samprate=srate)
+    
+    generator.load_preset('pitch_mapper')
 
+    # play interval in sequence
+    data_on = {'time': [0,0.2, 0.4], 'pitch': [0,1,2]}
+    data_off = {'time': [0.4,0.2, 0.], 'pitch': [0,1,2]}
+    lims = {'time': (0, 1)}
+    generator.modify_preset({'note_length':1,
+                             'filter':'on',
+                             'cutoff': 0.6,
+                             'volume_envelope': {'use':'on',
+                                                 'A':0.02, 'D':0.2, 'S':0}
+                             })
+    # set up source
+    sources_on = Events(data_on.keys())
+    sources_on.fromdict(data_on)
+    sources_on.apply_mapping_functions(map_lims=lims)
+
+    sources_off = Events(data_off.keys())
+    sources_off.fromdict(data_off)
+    sources_off.apply_mapping_functions(map_lims=lims)
+    
+    # render and play sonification!
+    on = Sonification(score, sources_on, generator, 'mono', samprate=srate)
+    off = Sonification(score, sources_off, generator, 'mono', samprate=srate)
+    on.render()
+    off.render()
+
+    notif_audio = {'on' : on.out_channels['0'].values,
+                   'off': off.out_channels['0'].values
+                   }
+
+    for k in notif_audio.keys():
+        sig = notif_audio[k]
+        notif_audio[k] = (INT_MAX * sig / abs(sig).max()).astype('int16')
+    print("made notifications...")
+    return notif_audio
+            
 def sonify_spectrum(spec, duration, overlap=0.05, system='mono', srate=44100, fmin=40, fmax=1300,
                     eln=False):
     notes = [["A2"]]
@@ -72,6 +114,9 @@ class CubeListenerData:
         self.maxval = pow(2, bdepth-1) - 1
         self.fadedx = 0
 
+        # generate notification audio
+        self.notification_sounds = make_notification_sounds(srate=44100, duration=0.5)
+        
         if vol is None:
             self.atten_level = 1
         else:

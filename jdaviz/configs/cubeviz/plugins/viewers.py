@@ -15,12 +15,24 @@ from jdaviz.configs.specviz.plugins.viewers import SpecvizProfileView
 from jdaviz.core.freezable_state import FreezableBqplotImageViewerState
 from jdaviz.configs.cubeviz.plugins.cube_listener import CubeListenerData, MINVOL, INT_MAX
 
-
+_has_sound = True
 try:
     import sounddevice as sd
+    if sd.default.device['output'] < 0:
+        _has_sound = False
 except ImportError:
-    pass
-
+    _has_sound = False
+if not _has_sound:
+    class DummySoundDevice:
+        class OutputStream:
+            def __init__(self, **kwargs):
+                self.closed = False
+            def stop(self):
+                self.closed = True
+            def start(self):    
+                self.closed = False
+    sd = DummySoundDevice()
+    
 __all__ = ['CubevizImageView', 'CubevizProfileView']
 
 
@@ -244,6 +256,8 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         # Set opacity to 0
         [layer for layer in self.state.layers if layer.layer.label == data_name][0].alpha = 0
 
+        return self.sonified_cube.sigcube
+        
     def _viewer_mouse_event(self, data):
         if data['event'] in ('mouseleave', 'mouseenter'):
             self.stop_stream()
