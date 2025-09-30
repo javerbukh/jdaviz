@@ -1,4 +1,4 @@
-from traitlets import Unicode, Bool, List, Unicode, observe
+from traitlets import Bool, List, Unicode, observe
 import astropy.units as u
 import os
 from io import BytesIO
@@ -6,13 +6,17 @@ from io import BytesIO
 from base64 import b64encode
 from jdaviz.core.custom_traitlets import IntHandleEmpty, FloatHandleEmpty
 from jdaviz.core.registries import tray_registry
-from jdaviz.core.template_mixin import (PluginTemplateMixin, DatasetSelectMixin,
-                                        SpectralSubsetSelectMixin, with_spinner,
-                                        AddResultsMixin)
+from jdaviz.core.template_mixin import (
+    PluginTemplateMixin,
+    DatasetSelectMixin,
+    SpectralSubsetSelectMixin,
+    with_spinner,
+    AddResultsMixin,
+)
 from jdaviz.core.user_api import PluginUserApi
 
 
-__all__ = ['SonifyData']
+__all__ = ["SonifyData"]
 
 try:
     import strauss
@@ -23,18 +27,24 @@ except ImportError:
 try:
     import sounddevice as sd
 except ImportError:
+
     class Empty:
         pass
+
     sd = Empty()
     sd.default = Empty()
     sd.default.device = [-1, -1]
 
 # TODO: create this directory for stock sounds?
-SOUND_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'data', 'sounds')
+SOUND_DIR = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "..", "data", "sounds"
+)
 
-@tray_registry('cubeviz-sonify-data', label="Sonify Data")
-class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMixin,
-                 AddResultsMixin):
+
+@tray_registry("cubeviz-sonify-data", label="Sonify Data")
+class SonifyData(
+    PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMixin, AddResultsMixin
+):
     """
     See the :ref:`Sonify Data Plugin Documentation <cubeviz-sonify-data>` for more details.
 
@@ -45,6 +55,7 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
     * :meth:`~jdaviz.core.template_mixin.PluginTemplateMixin.open_in_tray`
     * :meth:`~jdaviz.core.template_mixin.PluginTemplateMixin.close_in_tray`
     """
+
     template_file = __file__, "sonify_data.vue"
 
     # Removing UI option to vary these for now
@@ -64,14 +75,14 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
 
     # TODO: can we refresh the list, so sounddevices are up-to-date when dropdown clicked?
     sound_devices_items = List().tag(sync=True)
-    sound_devices_selected = Unicode('').tag(sync=True)
+    sound_devices_selected = Unicode("").tag(sync=True)
 
     add_to_viewer_enabled = Bool(False).tag(sync=True)
 
     # SFX
-    sound_in = Unicode('').tag(sync=True)
-    sound_out = Unicode('').tag(sync=True)
-    sonified_audio_data = Unicode('').tag(sync=True)
+    sound_in = Unicode("").tag(sync=True)
+    sound_out = Unicode("").tag(sync=True)
+    sonified_audio_data = Unicode("").tag(sync=True)
 
     # some addiional attributes for JS
     first_sonification_done = Bool(False).tag(sync=True)
@@ -80,27 +91,29 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._plugin_description = 'Sonify a data cube'
-        self.docs_description = 'Sonify a data cube using the Strauss package.'
+        self._plugin_description = "Sonify a data cube"
+        self.docs_description = "Sonify a data cube using the Strauss package."
         if not self.has_strauss:
-            self.disabled_msg = ('To use Sonify Data, install strauss and restart Jdaviz. You '
-                                 'can do this by running pip install strauss in the command'
-                                 ' line and then launching Jdaviz. Currently, this plugin only'
-                                 ' works on devices with valid sound output.')
+            self.disabled_msg = (
+                "To use Sonify Data, install strauss and restart Jdaviz. You "
+                "can do this by running pip install strauss in the command"
+                " line and then launching Jdaviz. Currently, this plugin only"
+                " works on devices with valid sound output."
+            )
 
         else:
             self.sound_device_indexes = None
             self.refresh_device_list()
 
-        self.results_label_default = 'Sonified data'
-        self.add_to_viewer_selected = 'flux-viewer'
+        self.results_label_default = "Sonified data"
+        self.add_to_viewer_selected = "flux-viewer"
 
         # with open(os.path.join(SOUND_DIR, 'in.mp3')) as f:
         #     self.sound_in = f"data:audio/mpeg;base64,{b64encode(f.read).decode('utf-8')}"
 
     @property
     def user_api(self):
-        expose = ['sonify_cube']
+        expose = ["sonify_cube"]
         return PluginUserApi(self, expose)
 
     def sonify_cube(self):
@@ -110,38 +123,58 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         range for sonification.
         """
         if self.disabled_msg:
-            raise ValueError('Unable to sonify cube')
+            raise ValueError("Unable to sonify cube")
 
         # Get index of selected device
         if self.sound_devices_selected:
-            selected_device_index = self.sound_device_indexes[self.sound_devices_selected]
+            selected_device_index = self.sound_device_indexes[
+                self.sound_devices_selected
+            ]
         else:
             selected_device_index = None
-            
+
         # Apply spectral subset bounds
         if self.spectral_subset_selected != self.spectral_subset.default_text:
             display_unit = self.spectrum_viewer.state.x_display_unit
-            min_wavelength = self.spectral_subset.selected_obj.lower.to_value(u.Unit(display_unit))
-            max_wavelength = self.spectral_subset.selected_obj.upper.to_value(u.Unit(display_unit))
-            self.flux_viewer.update_listener_wls((min_wavelength, max_wavelength), display_unit)
+            min_wavelength = self.spectral_subset.selected_obj.lower.to_value(
+                u.Unit(display_unit)
+            )
+            max_wavelength = self.spectral_subset.selected_obj.upper.to_value(
+                u.Unit(display_unit)
+            )
+            self.flux_viewer.update_listener_wls(
+                (min_wavelength, max_wavelength), display_unit
+            )
 
         # Ensure the current spectral region bounds are up-to-date at render time
         self.update_wavelength_range(None)
         # generate the sonified cube
-        sonified_data = self.flux_viewer.get_sonified_cube(self.sample_rate, self.buffer_size,
-                                           selected_device_index, self.assidx, self.ssvidx,
-                                           self.pccut, self.audfrqmin,
-                                           self.audfrqmax, self.eln, self.use_pccut,
-                                           self.results_label)
-        
+        sonified_data = self.flux_viewer.get_sonified_cube(
+            self.sample_rate,
+            self.buffer_size,
+            selected_device_index,
+            self.assidx,
+            self.ssvidx,
+            self.pccut,
+            self.audfrqmin,
+            self.audfrqmax,
+            self.eln,
+            self.use_pccut,
+            self.results_label,
+        )
+
         # In-memory WAV file
         wav_buffer = BytesIO()
-        write_wav(wav_buffer, self.sample_rate, self.flux_viewer.sonified_cube.notification_sounds['on'].astype('int16'))
+        write_wav(
+            wav_buffer,
+            self.sample_rate,
+            self.flux_viewer.sonified_cube.notification_sounds["on"].astype("int16"),
+        )
         wav_buffer.seek(0)
 
-        self.sonified_audio_data = b64encode(wav_buffer.read()).decode('utf-8')
+        self.sonified_audio_data = b64encode(wav_buffer.read()).decode("utf-8")
         self.first_sonification_done = True
-        
+
     @with_spinner()
     def vue_sonify_cube(self, *args):
         self.sonify_cube()
@@ -150,9 +183,9 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         self.stream_active = not self.stream_active
         self.flux_viewer.stream_active = not self.flux_viewer.stream_active
 
-    @observe('spectral_subset_selected')
+    @observe("spectral_subset_selected")
     def update_wavelength_range(self, event):
-        if not hasattr(self, 'spectral_subset'):
+        if not hasattr(self, "spectral_subset"):
             return
         display_unit = self.spectrum_viewer.state.x_display_unit
         # is this spectral selection or the entire spectrum?
@@ -162,14 +195,14 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
             wlranges = None
         self.flux_viewer.update_listener_wls(wlranges, display_unit)
 
-    @observe('volume')
+    @observe("volume")
     def update_volume_level(self, event):
-        self.flux_viewer.update_volume_level(event['new'])
+        self.flux_viewer.update_volume_level(event["new"])
 
-    @observe('sound_devices_selected')
+    @observe("sound_devices_selected")
     def update_sound_device(self, event):
-        if event['new'] != event['old']:
-            didx = dict(zip(*self.build_device_lists()))[event['new']]
+        if event["new"] != event["old"]:
+            didx = dict(zip(*self.build_device_lists()))[event["new"]]
             self.flux_viewer.update_sound_device(didx)
 
     def refresh_device_list(self):
@@ -177,9 +210,11 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         self.sound_device_indexes = dict(zip(devices, indexes))
         self.sound_devices_items = devices
         if len(devices) > 0:
-            self.sound_devices_selected = dict(zip(indexes, devices))[sd.default.device[1]]
+            self.sound_devices_selected = dict(zip(indexes, devices))[
+                sd.default.device[1]
+            ]
         else:
-            self.sound_devices_selected = ''
+            self.sound_devices_selected = ""
 
     def vue_refresh_device_list_in_dropdown(self, *args):
         self.refresh_device_list()
@@ -190,7 +225,7 @@ class SonifyData(PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMi
         devices = []
         device_indexes = []
         for index, device in enumerate(sd.query_devices()):
-            if device['max_output_channels'] > 0 and device['name'] not in devices:
-                devices.append(device['name'])
+            if device["max_output_channels"] > 0 and device["name"] not in devices:
+                devices.append(device["name"])
                 device_indexes.append(index)
         return devices, device_indexes

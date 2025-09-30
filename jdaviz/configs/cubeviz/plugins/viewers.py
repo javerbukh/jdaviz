@@ -14,30 +14,41 @@ from jdaviz.configs.cubeviz.plugins.mixins import WithSliceIndicator, WithSliceS
 from jdaviz.configs.default.plugins.viewers import JdavizViewerMixin
 from jdaviz.configs.specviz.plugins.viewers import Spectrum1DViewer
 from jdaviz.core.freezable_state import FreezableBqplotImageViewerState
-from jdaviz.configs.cubeviz.plugins.cube_listener import CubeListenerData, MINVOL, INT_MAX
-from jdaviz.core.sonified_layers import (SonifiedDataLayerArtist,
-                                         SonifiedLayerStateWidget,
-                                         SonifiedLayerState)
+from jdaviz.configs.cubeviz.plugins.cube_listener import (
+    CubeListenerData,
+    MINVOL,
+    INT_MAX,
+)
+from jdaviz.core.sonified_layers import (
+    SonifiedDataLayerArtist,
+    SonifiedLayerStateWidget,
+    SonifiedLayerState,
+)
 
 _has_sound = True
 try:
     import sounddevice as sd
-    if sd.default.device['output'] < 0:
+
+    if sd.default.device["output"] < 0:
         _has_sound = False
 except ImportError:
     _has_sound = False
 if not _has_sound:
+
     class DummySoundDevice:
         class OutputStream:
             def __init__(self, **kwargs):
                 self.closed = False
+
             def stop(self):
                 self.closed = True
-            def start(self):    
+
+            def start(self):
                 self.closed = False
+
     sd = DummySoundDevice()
-    
-__all__ = ['CubevizImageView', 'CubevizProfileView']
+
+__all__ = ["CubevizImageView", "CubevizProfileView"]
 
 
 @viewer_registry("cubeviz-image-viewer", label="Image 2D (Cubeviz)")
@@ -46,14 +57,22 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
     # NOTE: zoom and pan are merged here for space consideration and to avoid
     # overflow to second row when opening the tray
     tools_nested = [
-                    ['jdaviz:homezoom', 'jdaviz:prevzoom'],
-                    ['jdaviz:pixelboxzoommatch', 'jdaviz:boxzoom',
-                     'jdaviz:pixelpanzoommatch', 'jdaviz:panzoom'],
-                    ['bqplot:truecircle', 'bqplot:rectangle', 'bqplot:ellipse',
-                     'bqplot:circannulus'],
-                    ['jdaviz:spectrumperspaxel'],
-                    ['jdaviz:sidebar_plot', 'jdaviz:sidebar_export']
-                ]
+        ["jdaviz:homezoom", "jdaviz:prevzoom"],
+        [
+            "jdaviz:pixelboxzoommatch",
+            "jdaviz:boxzoom",
+            "jdaviz:pixelpanzoommatch",
+            "jdaviz:panzoom",
+        ],
+        [
+            "bqplot:truecircle",
+            "bqplot:rectangle",
+            "bqplot:ellipse",
+            "bqplot:circannulus",
+        ],
+        ["jdaviz:spectrumperspaxel"],
+        ["jdaviz:sidebar_plot", "jdaviz:sidebar_export"],
+    ]
 
     default_class = None
     _state_cls = FreezableBqplotImageViewerState
@@ -65,11 +84,11 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         self.state._set_viewer(self)
 
         self._subscribe_to_layers_update()
-        self.state.add_callback('reference_data', self._initial_x_axis)
+        self.state.add_callback("reference_data", self._initial_x_axis)
 
-        self.add_event_callback(self._viewer_mouse_event, events=['mousemove',
-                                                                  'mouseleave',
-                                                                  'mouseenter'])
+        self.add_event_callback(
+            self._viewer_mouse_event, events=["mousemove", "mouseleave", "mouseenter"]
+        )
 
         # Hide axes by default
         self.state.show_axes = False
@@ -81,7 +100,7 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         self.sonification_wl_unit = None
         self.volume_level = None
 
-        self.data_menu._obj.dataset.add_filter('is_cube_or_image')
+        self.data_menu._obj.dataset.add_filter("is_cube_or_image")
 
         # Dictionary that contains keys with UUIDs for each
         # sonified data layer. The value of each key is another dictionary containing
@@ -90,7 +109,7 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         self.layer_volume = {}
         self.sonified_layers_enabled = []
         self.same_pix = None
-        self._cached_properties = ['combined_sonified_grid']
+        self._cached_properties = ["combined_sonified_grid"]
 
         self._layer_style_widget_cls[SonifiedDataLayerArtist] = SonifiedLayerStateWidget
 
@@ -130,10 +149,11 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         self.figure.axes[1].label_offset = "-50"
 
     def data(self, cls=None):
-        return [layer_state.layer  # .get_object(cls=cls or self.default_class)
-                for layer_state in self.state.layers
-                if hasattr(layer_state, 'layer') and
-                isinstance(layer_state.layer, BaseData)]
+        return [
+            layer_state.layer  # .get_object(cls=cls or self.default_class)
+            for layer_state in self.state.layers
+            if hasattr(layer_state, "layer") and isinstance(layer_state.layer, BaseData)
+        ]
 
     def start_stream(self):
         if self.stream and not self.stream.closed:
@@ -154,22 +174,23 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
             # Find layer, add volume check to dictionary and add callback to volume changing and
             # audible changing
             self.layer_volume[layer.layer.label] = layer.volume
-            self.sonified_layers_enabled += ([layer.layer.label] if
-                                             getattr(layer, 'audible', False) else [])
+            self.sonified_layers_enabled += (
+                [layer.layer.label] if getattr(layer, "audible", False) else []
+            )
 
             # TODO: is there a better way to ensure that only unique callbacks are added?
-            layer.remove_callback('volume', self.recalculate_combined_sonified_grid)
-            layer.remove_callback('audible', self.recalculate_combined_sonified_grid)
+            layer.remove_callback("volume", self.recalculate_combined_sonified_grid)
+            layer.remove_callback("audible", self.recalculate_combined_sonified_grid)
 
-            layer.add_callback('volume', self.recalculate_combined_sonified_grid)
-            layer.add_callback('audible', self.recalculate_combined_sonified_grid)
+            layer.add_callback("volume", self.recalculate_combined_sonified_grid)
+            layer.add_callback("audible", self.recalculate_combined_sonified_grid)
 
         # Need to force an update of the layer icons since
         # audible is a state attribute, not a layer artist attribute
         self.jdaviz_app.state.layer_icons.notify_all()
 
-        if 'combined_sonified_grid' in self.__dict__:
-            del self.__dict__['combined_sonified_grid']
+        if "combined_sonified_grid" in self.__dict__:
+            del self.__dict__["combined_sonified_grid"]
         self.combined_sonified_grid
 
     @cached_property
@@ -188,35 +209,43 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
             # TODO: apply 1/N or 1/N**0.5 normalisation per layer for N layers?
             for coord, sound_array in v.items():
                 if coord in compiled_coords:
-                    compiled_coords[coord] += ((sound_array * (int(self.layer_volume[k]) / 100)).
-                                               astype(int))
+                    compiled_coords[coord] += (
+                        sound_array * (int(self.layer_volume[k]) / 100)
+                    ).astype(int)
                 else:
-                    compiled_coords[coord] = ((sound_array * (int(self.layer_volume[k]) / 100)).
-                                              astype(int))
+                    compiled_coords[coord] = (
+                        sound_array * (int(self.layer_volume[k]) / 100)
+                    ).astype(int)
         return compiled_coords
 
-    def update_sonified_cube_with_coord(self, coord, vollim='buff'):
+    def update_sonified_cube_with_coord(self, coord, vollim="buff"):
         # Set newsig to the combined sound array at coord
-        if (not self.sonified_layers_enabled or
-                (int(coord[0]), int(coord[1])) not in self.combined_sonified_grid):
+        if (
+            not self.sonified_layers_enabled
+            or (int(coord[0]), int(coord[1])) not in self.combined_sonified_grid
+        ):
             return
 
         # use cached version of combined sonified grid
         compsig = self.combined_sonified_grid[int(coord[0]), int(coord[1])]
 
         # Adjust volume to remove clipping
-        if vollim == 'sig':
+        if vollim == "sig":
             # sigmoidal volume limiting
-            self.sonified_cube.newsig = (erf(compsig/INT_MAX) * INT_MAX).astype('int16')
-        elif vollim == 'clip':
+            self.sonified_cube.newsig = (erf(compsig / INT_MAX) * INT_MAX).astype(
+                "int16"
+            )
+        elif vollim == "clip":
             # hard-clipped volume limiting
-            self.sonified_cube.newsig = np.clip(compsig, -INT_MAX, INT_MAX).astype('int16')
-        elif vollim == 'buff':
+            self.sonified_cube.newsig = np.clip(compsig, -INT_MAX, INT_MAX).astype(
+                "int16"
+            )
+        elif vollim == "buff":
             # renormalise buffer
             sigmax = abs(compsig).max()
             if sigmax > INT_MAX:
-                compsig = ((INT_MAX/abs(compsig).max()) * compsig)
-            self.sonified_cube.newsig = compsig.astype('int16')
+                compsig = (INT_MAX / abs(compsig).max()) * compsig
+            self.sonified_cube.newsig = compsig.astype("int16")
         self.sonified_cube.cbuff = True
 
     def update_listener_wls(self, wranges, wunit):
@@ -228,20 +257,40 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
             return
 
         self.stop_stream()
-        self.stream = sd.OutputStream(samplerate=self.sample_rate, blocksize=self.buffer_size,
-                                      device=device_index, channels=1, dtype='int16',
-                                      latency='low', callback=self.sonified_cube.player_callback)
+        self.stream = sd.OutputStream(
+            samplerate=self.sample_rate,
+            blocksize=self.buffer_size,
+            device=device_index,
+            channels=1,
+            dtype="int16",
+            latency="low",
+            callback=self.sonified_cube.player_callback,
+        )
 
     def update_volume_level(self, level):
         if not self.sonified_cube:
             return
         self.volume_level = level
-        self.sonified_cube.atten_level = int(1/np.clip((level/100.)**2, MINVOL, 1))
+        self.sonified_cube.atten_level = int(
+            1 / np.clip((level / 100.0) ** 2, MINVOL, 1)
+        )
 
-    def get_sonified_cube(self, sample_rate, buffer_size, device, assidx, ssvidx,
-                          pccut, audfrqmin, audfrqmax, eln, use_pccut, results_label):
+    def get_sonified_cube(
+        self,
+        sample_rate,
+        buffer_size,
+        device,
+        assidx,
+        ssvidx,
+        pccut,
+        audfrqmin,
+        audfrqmax,
+        eln,
+        use_pccut,
+        results_label,
+    ):
         spectrum = self.active_cube_layer.layer.get_object(statistic=None)
-        wlens = spectrum.wavelength.to('m').value
+        wlens = spectrum.wavelength.to("m").value
         flux = spectrum.flux.value
         self.sample_rate = sample_rate
         self.buffer_size = buffer_size
@@ -250,9 +299,12 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
             wdx = np.zeros(wlens.size).astype(bool)
             for r in self.sonification_wl_ranges:
                 # index just the spectral subregion
-                wdx = np.logical_or(wdx,
-                                    np.logical_and(wlens >= r[0].to_value(u.m),
-                                                   wlens <= r[1].to_value(u.m)))
+                wdx = np.logical_or(
+                    wdx,
+                    np.logical_and(
+                        wlens >= r[0].to_value(u.m), wlens <= r[1].to_value(u.m)
+                    ),
+                )
             wlens = wlens[wdx]
             flux = flux[:, :, wdx]
 
@@ -271,18 +323,31 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
             # and re-clip
             clipped_arr = np.clip(clipped_arr, 0, np.inf)
 
-        self.sonified_cube = CubeListenerData(clipped_arr ** assidx, wlens, duration=0.2,
-                                              samplerate=sample_rate, buffsize=buffer_size,
-                                              wl_unit=self.sonification_wl_unit,
-                                              audfrqmin=audfrqmin, audfrqmax=audfrqmax,
-                                              eln=eln, vol=self.volume_level)
+        self.sonified_cube = CubeListenerData(
+            clipped_arr**assidx,
+            wlens,
+            duration=0.2,
+            samplerate=sample_rate,
+            buffsize=buffer_size,
+            wl_unit=self.sonification_wl_unit,
+            audfrqmin=audfrqmin,
+            audfrqmax=audfrqmax,
+            eln=eln,
+            vol=self.volume_level,
+        )
         self.sonified_cube.sonify_cube()
         self.sonified_cube.sigcube = (
-                self.sonified_cube.sigcube * pow(whitelight / whitelight.max(),
-                                                 ssvidx)).astype('int16')
-        self.stream = sd.OutputStream(samplerate=sample_rate, blocksize=buffer_size, device=device,
-                                      channels=1, dtype='int16', latency='low',
-                                      callback=self.sonified_cube.player_callback)
+            self.sonified_cube.sigcube * pow(whitelight / whitelight.max(), ssvidx)
+        ).astype("int16")
+        self.stream = sd.OutputStream(
+            samplerate=sample_rate,
+            blocksize=buffer_size,
+            device=device,
+            channels=1,
+            dtype="int16",
+            latency="low",
+            callback=self.sonified_cube.player_callback,
+        )
         self.sonified_cube.cbuff = True
 
         x_size = self.sonified_cube.sigcube.shape[0]
@@ -290,43 +355,58 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
 
         # Create a new entry for the sonified layer in data_lookup. The value is a dictionary
         # containing (x_size * y_size) keys with values being arrays that represent sounds
-        self.data_lookup[results_label] = {(x, y): self.sonified_cube.sigcube[x, y, :]
-                                           for x in range(0, x_size)
-                                           for y in range(0, y_size)}
+        self.data_lookup[results_label] = {
+            (x, y): self.sonified_cube.sigcube[x, y, :]
+            for x in range(0, x_size)
+            for y in range(0, y_size)
+        }
 
         # Create a 2D array with coordinates starting at (0, 0) and going until (x_size, y_size)
         a = np.arange(1, x_size * y_size + 1).reshape((x_size, y_size))
 
         # Create fake WCS so the sonified layer can be added to a CCDData object and
         # then get added to the image viewer
-        wcs = WCS({'CTYPE1': 'RA---TAN', 'CUNIT1': 'deg', 'CDELT1': -0.0002777777778,
-                   'CRPIX1': 1, 'CRVAL1': 337.5202808,
-                   'CTYPE2': 'DEC--TAN', 'CUNIT2': 'deg', 'CDELT2': 0.0002777777778,
-                   'CRPIX2': 1, 'CRVAL2': -20.833333059999998})
+        wcs = WCS(
+            {
+                "CTYPE1": "RA---TAN",
+                "CUNIT1": "deg",
+                "CDELT1": -0.0002777777778,
+                "CRPIX1": 1,
+                "CRVAL1": 337.5202808,
+                "CTYPE2": "DEC--TAN",
+                "CUNIT2": "deg",
+                "CDELT2": 0.0002777777778,
+                "CRPIX2": 1,
+                "CRVAL2": -20.833333059999998,
+            }
+        )
 
         # Create add data with name results_label to data collection and then add it to the
         # flux viewer
-        sonified_cube = CCDData(a * u.Unit(''), wcs=wcs)
+        sonified_cube = CCDData(a * u.Unit(""), wcs=wcs)
         self.jdaviz_app.data_collection[results_label] = sonified_cube
-        self.jdaviz_app.data_collection[results_label].meta['Sonified'] = True
+        self.jdaviz_app.data_collection[results_label].meta["Sonified"] = True
 
-        self.jdaviz_app.add_data_to_viewer('flux-viewer', results_label)
+        self.jdaviz_app.add_data_to_viewer("flux-viewer", results_label)
 
         # Clear cache and recompute
         self.recalculate_combined_sonified_grid()
 
         return self.sonified_cube.sigcube
-        
+
     def _viewer_mouse_event(self, data):
-        if data['event'] in ('mouseleave', 'mouseenter') or not self.sonified_layers_enabled:
+        if (
+            data["event"] in ("mouseleave", "mouseenter")
+            or not self.sonified_layers_enabled
+        ):
             self.stop_stream()
             return
         if len(self.jdaviz_app.data_collection) < 1:
             return
 
         # Extract data coordinates - these are pixels in the reference image
-        x = np.floor(data['domain']['x'])
-        y = np.floor(data['domain']['y'])
+        x = np.floor(data["domain"]["x"])
+        y = np.floor(data["domain"]["y"])
 
         if x is None or y is None or x < 0 or y < 0:  # Out of bounds
             return
@@ -336,14 +416,17 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         elif (x, y) == self.same_pix:
             return
 
-        if (not self.sonified_cube or not hasattr(self.sonified_cube, 'newsig') or
-                not hasattr(self.sonified_cube, 'sigcube')):
+        if (
+            not self.sonified_cube
+            or not hasattr(self.sonified_cube, "newsig")
+            or not hasattr(self.sonified_cube, "sigcube")
+        ):
             return
         self.start_stream()
         self.update_sonified_cube_with_coord((x, y))
 
     def get_data_layer_artist(self, layer=None, layer_state=None):
-        if 'Sonified' in layer.meta:
+        if "Sonified" in layer.meta:
             cls = SonifiedDataLayerArtist
             return self.get_layer_artist(cls, layer=layer)
         else:
@@ -354,16 +437,16 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
 class CubevizProfileView(Spectrum1DViewer, WithSliceIndicator):
     # categories: zoom resets, zoom, pan, subset, select tools, shortcuts
     tools_nested = [
-                    ['jdaviz:homezoom', 'jdaviz:prevzoom'],
-                    ['jdaviz:boxzoom', 'jdaviz:xrangezoom', 'jdaviz:yrangezoom'],
-                    ['jdaviz:panzoom', 'jdaviz:panzoom_x', 'jdaviz:panzoom_y'],
-                    ['bqplot:xrange'],
-                    ['jdaviz:selectslice', 'jdaviz:selectline'],
-                    ['jdaviz:sidebar_plot', 'jdaviz:sidebar_export']
-                ]
+        ["jdaviz:homezoom", "jdaviz:prevzoom"],
+        ["jdaviz:boxzoom", "jdaviz:xrangezoom", "jdaviz:yrangezoom"],
+        ["jdaviz:panzoom", "jdaviz:panzoom_x", "jdaviz:panzoom_y"],
+        ["bqplot:xrange"],
+        ["jdaviz:selectslice", "jdaviz:selectline"],
+        ["jdaviz:sidebar_plot", "jdaviz:sidebar_export"],
+    ]
 
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault('default_tool_priority', ['jdaviz:selectslice'])
+        kwargs.setdefault("default_tool_priority", ["jdaviz:selectslice"])
         super().__init__(*args, **kwargs)
 
     @property
