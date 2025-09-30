@@ -19,12 +19,24 @@ from jdaviz.core.sonified_layers import (SonifiedDataLayerArtist,
                                          SonifiedLayerStateWidget,
                                          SonifiedLayerState)
 
-
+_has_sound = True
 try:
     import sounddevice as sd
+    if sd.default.device['output'] < 0:
+        _has_sound = False
 except ImportError:
-    pass
-
+    _has_sound = False
+if not _has_sound:
+    class DummySoundDevice:
+        class OutputStream:
+            def __init__(self, **kwargs):
+                self.closed = False
+            def stop(self):
+                self.closed = True
+            def start(self):    
+                self.closed = False
+    sd = DummySoundDevice()
+    
 __all__ = ['CubevizImageView', 'CubevizProfileView']
 
 
@@ -303,6 +315,8 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         # Clear cache and recompute
         self.recalculate_combined_sonified_grid()
 
+        return self.sonified_cube.sigcube
+        
     def _viewer_mouse_event(self, data):
         if data['event'] in ('mouseleave', 'mouseenter') or not self.sonified_layers_enabled:
             self.stop_stream()
