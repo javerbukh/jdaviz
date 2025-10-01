@@ -19,7 +19,7 @@ from jdaviz.core.user_api import PluginUserApi
 __all__ = ["SonifyData"]
 
 try:
-    import strauss
+    import strauss # noqa
     from scipy.io.wavfile import write as write_wav
     _has_strauss = True
 except ImportError:
@@ -149,7 +149,7 @@ class SonifyData(
         # Ensure the current spectral region bounds are up-to-date at render time
         self.update_wavelength_range(None)
         # generate the sonified cube
-        sonified_data = self.flux_viewer.get_sonified_cube(
+        sonified_data = self.flux_viewer.get_sonified_cube(  # noqa
             self.sample_rate,
             self.buffer_size,
             selected_device_index,
