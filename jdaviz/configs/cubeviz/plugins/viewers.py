@@ -131,7 +131,7 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         if ref_data and ref_data.ndim == 3:
             for att_name in ["Right Ascension", "RA", "Galactic Longitude"]:
                 if att_name in ref_data.component_ids():
-                    x_att = att_name
+                    x_tt = att_name
                     self.state.x_att_world = ref_data.id[x_att]
                     break
             else:
@@ -422,7 +422,11 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
             or not hasattr(self.sonified_cube, "sigcube")
         ):
             return
+        
         self.start_stream()
+        self.lindx = int(x*self.sonified_cube.sigcube.shape[1] + y)
+        
+        # print(x,y, self.lindx)
         self.update_sonified_cube_with_coord((x, y))
 
     def get_data_layer_artist(self, layer=None, layer_state=None):

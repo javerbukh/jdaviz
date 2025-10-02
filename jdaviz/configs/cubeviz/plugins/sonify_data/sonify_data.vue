@@ -145,12 +145,23 @@
     <j-plugin-section-header>Add Results Options</j-plugin-section-header>
     <v-row>
     </v-row>
-      <plugin-action-button
-        :spinner="spinner"
-        @click="handleSonifyClick"
-      > Sonify Data
-      </plugin-action-button>
- </j-tray-plugin>
+      <plugin-add-results
+	:label.sync="results_label"
+	:label_default="results_label_default"
+	:label_auto.sync="results_label_auto"
+	:label_invalid_msg="results_label_invalid_msg"
+	:label_overwrite="results_label_overwrite"
+	label_hint="Label for the sonified data"
+	:add_to_viewer_items="add_to_viewer_items"
+	:add_to_viewer_selected.sync="add_to_viewer_selected"
+	action_label="Sonify data"
+	action_tooltip="Create sonified data and add to flux viewer"
+	:action_spinner="spinner"
+	action_api_hint='plg.sonify_cube()'
+	:add_to_viewer_disabled="true"
+	@click:action="handleSonifyClick"
+	      ></plugin-add-results>
+ </j-tray-pluin>
 </template>
 
 <script>
@@ -173,34 +184,59 @@
           // this sound is now being rendered by the browser (not streamed to a sound device by
           // python) so should be possible on platforms.
           console.log('New audio data incoming...')
-          const arrayBuffer = this.sonified_audio_data_str.buffer;
-          this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+          const onAudioArrayBuffer = this.on_audio_data_str.buffer;
+          this.onAudioBuffer = await this.audioContext.decodeAudioData(onAudioArrayBuffer);
+
+          if (this.cube_audio_data_str) {
+            const cubeAudioArrayBuffer = this.cube_audio_data_str.buffer;
+            this.cubeAudioBuffer1 = await this.audioContext.decodeAudioData(cubeAudioArrayBuffer);
+            this.cubeAudioBuffer2 = await this.audioContext.decodeAudioData(cubeAudioArrayBuffer);
+          }
 
           // 1. Create a GainNode to control volume
           const gainNode = this.audioContext.createGain();
           gainNode.gain.value = 0.5; 
           gainNode.connect(this.audioContext.destination);
           
-          this.sourceNode = this.audioContext.createBufferSource();
-          this.sourceNode.buffer = this.audioBuffer;
-          this.sourceNode.connect(gainNode);
-          this.sourceNode.start(0);
+          this.sourceNode1 = this.audioContext.createBufferSource();
+          this.sourceNode1.buffer = this.onAudioBuffer;
+          this.sourceNode1.connect(gainNode);
+          this.sourceNode1.start(0);
         } catch (error) {
             console.error('Audio load error:', error);
             throw error;
         }
       }
     },
+      
     watch: {
-      sonified_audio_data(newVal) {
-        if (newVal) {
-          this.loadAudio();
-        }
-      }
+	on_audio_data(newVal) {
+            if (newVal) {
+		this.loadAudio();
+            }
+	},
+	x_pos(newVal) {
+            console.log("x_pos changed:", newVal);
+	},
+	y_pos(newVal) {
+            console.log("y_pos changed:", newVal);
+	},
     },
     computed: {
-      sonified_audio_data_str() {
-        const binary_string = window.atob(this.sonified_audio_data);
+      on_audio_data_str() {
+        const binary_string = window.atob(this.on_audio_data);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes;
+      },
+      cube_audio_data_str() {
+        if (!this.cube_audio_data) {
+          return null;
+        }
+        const binary_string = window.atob(this.cube_audio_data);
         const len = binary_string.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) {

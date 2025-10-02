@@ -3,6 +3,7 @@ import astropy.units as u
 import os
 from io import BytesIO
 
+from jdaviz.core.events import ViewerAddedMessage, GlobalDisplayUnitChanged
 from base64 import b64encode
 from jdaviz.core.custom_traitlets import IntHandleEmpty, FloatHandleEmpty
 from jdaviz.core.registries import tray_registry
@@ -12,6 +13,7 @@ from jdaviz.core.template_mixin import (
     SpectralSubsetSelectMixin,
     with_spinner,
     AddResultsMixin,
+    ViewerSelectMixin,
 )
 from jdaviz.core.user_api import PluginUserApi
 
@@ -44,7 +46,7 @@ SOUND_DIR = os.path.join(
 
 @tray_registry("cubeviz-sonify-data", label="Sonify Data")
 class SonifyData(
-    PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMixin, AddResultsMixin
+        PluginTemplateMixin, DatasetSelectMixin, SpectralSubsetSelectMixin, AddResultsMixin, ViewerSelectMixin 
 ):
     """
     See the :ref:`Sonify Data Plugin Documentation <cubeviz-sonify-data>` for more details.
@@ -73,7 +75,8 @@ class SonifyData(
     stream_active = Bool(True).tag(sync=True)
     has_strauss = Bool(_has_strauss).tag(sync=True)
     has_outs = Bool((sd.default.device[1] != -1)).tag(sync=True)
-
+    scrubdx = IntHandleEmpty(0).tag(sync=True)
+    
     # TODO: can we refresh the list, so sounddevices are up-to-date when dropdown clicked?
     sound_devices_items = List().tag(sync=True)
     sound_devices_selected = Unicode("").tag(sync=True)
@@ -83,12 +86,16 @@ class SonifyData(
     # SFX
     sound_in = Unicode("").tag(sync=True)
     sound_out = Unicode("").tag(sync=True)
-    sonified_audio_data = Unicode("").tag(sync=True)
-
+    on_audio_data = Unicode("").tag(sync=True)
+    cube_audio_data = Unicode("").tag(sync=True)
+    
     # some addiional attributes for JS
     first_sonification_done = Bool(False).tag(sync=True)
     thisfile = Unicode(SOUND_DIR).tag(sync=True)
-
+    x_pos = IntHandleEmpty(0).tag(sync=True)
+    y_pos = IntHandleEmpty(0).tag(sync=True)
+    lindx = IntHandleEmpty(0).tag(sync=True)
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -109,12 +116,35 @@ class SonifyData(
         self.results_label_default = "Sonified data"
         self.add_to_viewer_selected = "flux-viewer"
 
-        # with open(os.path.join(SOUND_DIR, 'in.mp3')) as f:
+        # and any future flux viewers
+        # self.hub.subscribe(
+        #     self, ViewerAddedMessage, handler=self._on_viewer_added
+        # )
+        # wih open(os.path.join(SOUND_DIR, 'in.mp3')) as f:
         #     self.sound_in = f"data:audio/mpeg;base64,{b64encode(f.read).decode('utf-8')}"
 
+    def _on_viewer_added(self, msg):
+        # TODO 
+        pass
+        self._create_viewer_callbacks(self.app.get_viewer_by_id(msg.viewer_id))
+        
+    def _create_viewer_callbacks(self, viewer):
+        callback = self._viewer_callback(viewer, self._on_viewer_mouse_move)
+        viewer.add_event_callback(callback, events=['mousemove'])
+        
+    def _on_viewer_mouse_move(self, viewer, data):
+        if data['event'] == 'mousemove':
+            pixel_data = self.coords_info.as_dict()
+            self.x_pos, self.y_pos = int(pixel_data['axes_x']), int(pixel_data['axes_y'])
+            self.lindx = int(self.x_pos*self.flux_viewer.sonified_cube.sigcube.shape[1] + self.y_pos)
+            
+    @property
+    def coords_info(self):
+        return self.app.session.application._tools['g-coords-info']
+            
     @property
     def user_api(self):
-        expose = ["sonify_cube"]
+        expose = ["sonify_cube", "lindx", "x_pos", "y_pos"]
         return PluginUserApi(self, expose)
 
     def sonify_cube(self):
@@ -130,7 +160,7 @@ class SonifyData(
         if self.sound_devices_selected:
             selected_device_index = self.sound_device_indexes[
                 self.sound_devices_selected
-            ]
+                ]
         else:
             selected_device_index = None
 
@@ -150,7 +180,7 @@ class SonifyData(
         # Ensure the current spectral region bounds are up-to-date at render time
         self.update_wavelength_range(None)
         # generate the sonified cube
-        sonified_data = self.flux_viewer.get_sonified_cube(  # noqa
+        self.flux_viewer.get_sonified_cube(
             self.sample_rate,
             self.buffer_size,
             selected_device_index,
@@ -164,22 +194,37 @@ class SonifyData(
             self.results_label,
         )
 
-        # In-memory WAV file
-        wav_buffer = BytesIO()
+        # lets create a callback to follow the flux-viewer mouse positions
+        self._create_viewer_callbacks(self.app.get_viewer('flux-viewer'))
+
+
+        wholecube = (self.flux_viewer.sonified_cube.sigcube).flatten()
+        print(wholecube.max(), wholecube.dtype)
+        cube_buffer = BytesIO()
         write_wav(
-            wav_buffer,
+            cube_buffer,
+            self.sample_rate,
+            wholecube,
+        )
+        cube_buffer.seek(0)
+        self.cube_audio_data = b64encode(cube_buffer.read()).decode("utf-8")
+        
+        # In-memory WAV file
+        on_buffer = BytesIO()
+        write_wav(
+            on_buffer,
             self.sample_rate,
             self.flux_viewer.sonified_cube.notification_sounds["on"].astype("int16"),
         )
-        wav_buffer.seek(0)
+        on_buffer.seek(0)
 
-        self.sonified_audio_data = b64encode(wav_buffer.read()).decode("utf-8")
+        self.on_audio_data = b64encode(on_buffer.read()).decode("utf-8")
         self.first_sonification_done = True
-
+        
     @with_spinner()
     def vue_sonify_cube(self, *args):
         self.sonify_cube()
-
+        
     def vue_start_stop_stream(self, *args):
         self.stream_active = not self.stream_active
         self.flux_viewer.stream_active = not self.flux_viewer.stream_active

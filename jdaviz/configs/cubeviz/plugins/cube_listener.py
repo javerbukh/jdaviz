@@ -105,8 +105,8 @@ def sonify_spectrum(
 
     # set range in spectral flux representing the maximum and minimum sound frequency power:
     # 0 (numeric): absolute 0 in flux units, such that any flux above 0 will sound.
-    # '100' (string): 100th percentile (i.e. maximum value) in spectral flux.
-    lims = {"spectrum": (0, "%100")}
+    # '100' (string): 100th percntile (i.e. maximum value) in spectral flux.
+    lims = {"spectrum": (0, "100%")}
 
     # set up source
     sources = Events(data.keys())
@@ -170,6 +170,7 @@ class CubeListenerData:
 
         self.idx1 = 0
         self.idx2 = 0
+        self.lindx = 0
         self.cbuff = False
         self.cursig = np.zeros(self.siglen, dtype="int16")
         self.newsig = np.zeros(self.siglen, dtype="int16")
@@ -180,6 +181,7 @@ class CubeListenerData:
             raise Exception("Cube projected to be > 2Gb!")
 
         self.sigcube = np.zeros((*self.cube.shape[:2], self.siglen), dtype="int16")
+        self.sigcube_mask = np.zeros((*self.cube.shape[:2],), dtype="bool")
 
     def set_wl_bounds(self, w1, w2):
         """
@@ -194,7 +196,7 @@ class CubeListenerData:
         in class attributes
         """
         lo2hi = self.wlens.argsort()[::-1]
-
+        
         t0 = time.time()
         for i in range(self.cube.shape[0]):
             for j in range(self.cube.shape[1]):
@@ -210,7 +212,9 @@ class CubeListenerData:
                         )
                         sig = (sig * self.maxval).astype("int16")
                         self.sigcube[i, j, :] = sig
+                        self.sigcube_mask[i, j] = True
                     else:
+                        self.sigcube_mask[i, j] = False
                         continue
         self.cursig[:] = self.sigcube[self.idx1, self.idx2, :]
         self.newsig[:] = self.cursig[:]
