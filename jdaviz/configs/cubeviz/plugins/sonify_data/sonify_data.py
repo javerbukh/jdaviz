@@ -140,12 +140,10 @@ class SonifyData(
 
     def _on_viewer_mouse_enter(self, viewer, data):
         if data['event'] == 'mouseenter':
-            print('in')
             self.is_playing = True
             
     def _on_viewer_mouse_leave(self, viewer, data):
         if data['event'] == 'mouseleave':
-            print('out')
             self.is_playing = False
             
     @property
@@ -155,7 +153,8 @@ class SonifyData(
     @property
     def user_api(self):
         expose = ["sonify_cube", "lindx", "x_pos", "y_pos",
-                  "nsamps", "nsecs", "sample_rate", "is_playing"]
+                  "nsamps", "nsecs", "sample_rate", "is_playing",
+                  "volume"]
         return PluginUserApi(self, expose)
 
     def sonify_cube(self):

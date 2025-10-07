@@ -186,8 +186,8 @@ export default {
 	this.toneJsLoadPromise = new Promise((resolve, reject) => {
             if (window.Tone) {
 		console.log('Tone.js already loaded.');
-		console.log("Tone.context.lookAhead = ", Tone.context.lookAhead, " s");
-		console.log("Tone.context.updateInterval = ", Tone.context.updateInterval, " s");
+		console.log("Tone.context.lookAhead = ", Tone.context.lookAhead, "s");
+		console.log("Tone.context.updateInterval = ", Tone.context.updateInterval, "s");
 		return resolve();
             }
             console.log('Loading Tone.js...');
@@ -195,8 +195,8 @@ export default {
             script.src = 'https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js';
             script.onload = () => {
 		console.log('Tone.js loaded successfully.');
-		console.log("Tone.context.lookAhead = ", Tone.context.lookAhead, " s");
-		console.log("Tone.context.updateInterval = ", Tone.context.updateInterval, " s");
+		console.log("Tone.context.lookAhead = ", Tone.context.lookAhead, "s");
+		console.log("Tone.context.updateInterval = ", Tone.context.updateInterval, "s");
 		resolve();
             };
             script.onerror = (error) => {
@@ -207,6 +207,7 @@ export default {
 	});
     },
     beforeDestroy() {
+	console.log("Destroying...")
         // Stop transport and clean up Tone.js objects
         if (window.Tone && Tone.Transport.state === 'started') {
             Tone.Transport.stop();
@@ -225,7 +226,7 @@ export default {
 	},
 	async loadAudio() {
             try {
-		// Wait for Tone.js to be loaded
+		// Wait for Tone.js to load
 		await this.toneJsLoadPromise;
 		
 		// Ensure Tone.js is started
@@ -239,8 +240,7 @@ export default {
 		// --- Handle one-shot audio with Tone.Player ---
 		const onAudioBuffer = await new Tone.Buffer().load(this.on_audio_data_url);
 		const oneShotPlayer = new Tone.Player(onAudioBuffer).toDestination();
-		oneShotPlayer.volume.value = 0; // 0dB to not redline anything
-		oneShotPlayer.start();
+		oneShotPlayer.volume.value = -0.2; // -0.2dB to not redline anything
 		
 		// --- Pre-load and pre-route looping cube audio with Tone.js ---
 		if (this.cube_audio_data && !this.player1) {
@@ -255,11 +255,17 @@ export default {
 		    this.player2 = new Tone.Player(cubeAudioBuffer);
 		    
                     // Create panners for stereo separation (debugging)
+		    // TODO remove panning layer once happy with implementation
                     this.panner1 = new Tone.Panner(0); // Hard left
                     this.panner2 = new Tone.Panner(0);  // Hard right
 		    
-		    // Create the crossfade and connect the players
-		    this.crossFade = new Tone.CrossFade().toDestination();
+		    // Create a gain node for the sonification volume control
+		    this.loopGain = new Tone.Gain(0).toDestination();
+
+		    // Create the crossfade and connect it to the gain node
+		    this.crossFade = new Tone.CrossFade();
+		    this.crossFade.connect(this.loopGain);
+
 		    this.player1.connect(this.panner1);
                     this.panner1.connect(this.crossFade.a);
 		    this.player2.connect(this.panner2);
@@ -273,21 +279,23 @@ export default {
 		    // Calculate and store the precise loop duration.
                     this.loopDuration = this.nsamps / this.sample_rate;
 		    
-                    this.player1.loopStart = 600 * this.loopDuration; // Custom property to store offset
-                    this.player2.loopStart = 600 * this.loopDuration;
-		    this.player1.loopEnd = 601 * this.loopDuration; // Custom property to store offset
-                    this.player2.loopEnd = 601 * this.loopDuration;
+                    this.player1.loopStart = 0 * this.loopDuration; // Custom property to store offset
+                    this.player2.loopStart = 0 * this.loopDuration;
+		    this.player1.loopEnd = 1 * this.loopDuration; // Custom property to store offset
+                    this.player2.loopEnd = 1 * this.loopDuration;
                     this.player1.loop = true;
                     this.player2.loop = true;
-		    // this.player1.start();
-                    // this.player2.start();
+
 		    // Make sure the transport is running for scheduling
 		    if (Tone.Transport.state !== 'started') {
 			Tone.Transport.start();
 		    }
 
-		    // initialise it watching for lindx
-		    this.is_playing = true;
+		    // confirm we are ready with audio cue 
+		    oneShotPlayer.start();
+		    
+		    // initialise as not playing
+		    this.is_playing = false;
 		}
             } catch (error) {
 		console.error('Audio load error:', error);
@@ -306,12 +314,12 @@ export default {
         },
         handleLindxChange(newVal, oldVal) {
 
-	    // are we ready to start playback?
+	    // Are we ready to start playback?
             if (!this.player1 || !this.player2 || newVal === oldVal || !window.Tone || !this.is_playing) {
                 return;
             }
 
-	    // is this a sanctioned lindx value?
+	    // Is this a sanctioned lindx value?
 	    if(newVal > (this.npix-1) || newVal < 0) {
 		return;
 	    }
@@ -357,7 +365,7 @@ export default {
 	    Tone.Draw.schedule(() => {
 		// This callback is now running in sync with the audio thread		
 		this.handleFadeComplete(newVal);
-	    }, Tone.now() + fadeTime +0.1);
+	    }, Tone.now() + fadeTime);
 
         }
     },
@@ -372,21 +380,37 @@ export default {
             this.handleLindxChange(newVal, oldVal);
 	},
 	is_playing(newVal) {
-
-	    // are we ready to start playback?
-            if (!this.player1 || !this.player2 || !window.Tone || this.is_playing == null) {
+            if (!this.player1 || !this.player2 || !window.Tone || this.is_playing === null) {
                 return;
-	    }
+            }
 
-	    console.log("this.is_playing = ", newVal);
-	    const playerToUpdate = this.activePlayer === 1 ? this.player2 : this.player1;	    
-	    if (newVal) {
-		playerToUpdate.start();
-	    } else {
-		this.player1.stop();
-                this.player2.stop();
-		this.player2.lindx = -1;
-	    }
+            console.log("is_playing changed to: ", newVal);
+            const fadeTime = Tone.context.updateInterval;
+
+            if (newVal) {
+                // Start transport if not already running, then start players and fade in
+                if (Tone.Transport.state !== 'started') {
+                    Tone.Transport.start();
+                }
+                this.player1.start();
+                this.player2.start();
+                this.loopGain.gain.rampTo(1, fadeTime);
+            } else {
+                // Fade out, then schedule players and transport to stop
+                this.loopGain.gain.rampTo(0, fadeTime);
+                const stopTime = Tone.now() + fadeTime;
+
+                Tone.Transport.schedule((time) => {
+                    this.player1.stop(time);
+                    this.player2.stop(time);
+                }, stopTime);
+
+                Tone.Transport.scheduleOnce((time) => {
+                    if (Tone.Transport.state === 'started') {
+                        Tone.Transport.stop(time);
+                    }
+                }, stopTime + 0.01); // Stop transport slightly after players
+            }
 	}
     },
     computed: {
