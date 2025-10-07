@@ -62,7 +62,7 @@ class SonifyData(
     template_file = __file__, "sonify_data.vue"
 
     # Removing UI option to vary these for now
-    sample_rate = 44100  # IntHandleEmpty(44100).tag(sync=True)
+    sample_rate = IntHandleEmpty(44100).tag(sync=True)
     buffer_size = 2048  # IntHandleEmpty(2048).tag(sync=True)
     assidx = FloatHandleEmpty(2.5).tag(sync=True)
     ssvidx = FloatHandleEmpty(0.65).tag(sync=True)
@@ -92,9 +92,13 @@ class SonifyData(
     # some addiional attributes for JS
     first_sonification_done = Bool(False).tag(sync=True)
     thisfile = Unicode(SOUND_DIR).tag(sync=True)
-    x_pos = IntHandleEmpty(0).tag(sync=True)
-    y_pos = IntHandleEmpty(0).tag(sync=True)
-    lindx = IntHandleEmpty(0).tag(sync=True)
+    x_pos = IntHandleEmpty(-1).tag(sync=True)
+    y_pos = IntHandleEmpty(-1).tag(sync=True)
+    lindx = IntHandleEmpty(-1).tag(sync=True)
+    nsamps = IntHandleEmpty(-1).tag(sync=True)
+    npix = IntHandleEmpty(-1).tag(sync=True)
+    nsecs = FloatHandleEmpty(-1).tag(sync=True)
+    is_playing = Bool(False).tag(sync=True)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -116,35 +120,42 @@ class SonifyData(
         self.results_label_default = "Sonified data"
         self.add_to_viewer_selected = "flux-viewer"
 
-        # and any future flux viewers
-        # self.hub.subscribe(
-        #     self, ViewerAddedMessage, handler=self._on_viewer_added
-        # )
-        # wih open(os.path.join(SOUND_DIR, 'in.mp3')) as f:
-        #     self.sound_in = f"data:audio/mpeg;base64,{b64encode(f.read).decode('utf-8')}"
-
     def _on_viewer_added(self, msg):
         # TODO 
         pass
-        self._create_viewer_callbacks(self.app.get_viewer_by_id(msg.viewer_id))
-        
+    
     def _create_viewer_callbacks(self, viewer):
-        callback = self._viewer_callback(viewer, self._on_viewer_mouse_move)
-        viewer.add_event_callback(callback, events=['mousemove'])
-        
+        mm_callback = self._viewer_callback(viewer, self._on_viewer_mouse_move)
+        me_callback = self._viewer_callback(viewer, self._on_viewer_mouse_enter)
+        ml_callback = self._viewer_callback(viewer, self._on_viewer_mouse_leave)
+        viewer.add_event_callback(mm_callback, events=['mousemove'])
+        viewer.add_event_callback(me_callback, events=['mouseenter'])
+        viewer.add_event_callback(ml_callback, events=['mouseleave'])
+                        
     def _on_viewer_mouse_move(self, viewer, data):
         if data['event'] == 'mousemove':
             pixel_data = self.coords_info.as_dict()
             self.x_pos, self.y_pos = int(pixel_data['axes_x']), int(pixel_data['axes_y'])
             self.lindx = int(self.x_pos*self.flux_viewer.sonified_cube.sigcube.shape[1] + self.y_pos)
+
+    def _on_viewer_mouse_enter(self, viewer, data):
+        if data['event'] == 'mouseenter':
+            print('in')
+            self.is_playing = True
+            
+    def _on_viewer_mouse_leave(self, viewer, data):
+        if data['event'] == 'mouseleave':
+            print('out')
+            self.is_playing = False
             
     @property
     def coords_info(self):
         return self.app.session.application._tools['g-coords-info']
-            
+    
     @property
     def user_api(self):
-        expose = ["sonify_cube", "lindx", "x_pos", "y_pos"]
+        expose = ["sonify_cube", "lindx", "x_pos", "y_pos",
+                  "nsamps", "nsecs", "sample_rate", "is_playing"]
         return PluginUserApi(self, expose)
 
     def sonify_cube(self):
@@ -160,7 +171,7 @@ class SonifyData(
         if self.sound_devices_selected:
             selected_device_index = self.sound_device_indexes[
                 self.sound_devices_selected
-                ]
+            ]
         else:
             selected_device_index = None
 
@@ -194,6 +205,10 @@ class SonifyData(
             self.results_label,
         )
 
+        self.nsamps = self.flux_viewer.sonified_cube.sigcube.shape[-1]
+        self.npix = self.flux_viewer.sonified_cube.sigcube[:,:,0].size
+        self.nsecs = self.flux_viewer.sonified_cube.sigcube.shape[-1]/self.sample_rate
+        
         # lets create a callback to follow the flux-viewer mouse positions
         self._create_viewer_callbacks(self.app.get_viewer('flux-viewer'))
 
@@ -239,7 +254,7 @@ class SonifyData(
             wlranges = self.spectral_subset.selected_obj.subregions
         else:
             wlranges = None
-        self.flux_viewer.update_listener_wls(wlranges, display_unit)
+            self.flux_viewer.update_listener_wls(wlranges, display_unit)
 
     @observe("volume")
     def update_volume_level(self, event):

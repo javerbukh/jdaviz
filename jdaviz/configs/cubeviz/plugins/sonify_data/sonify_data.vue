@@ -55,7 +55,7 @@
                 v-model.number="audfrqmin"
                 hint="The minimum audio frequency used to represent the spectra (Hz)"
                 persistent-hint
-              ></v-text-field>
+              ></v--text-field>
             </v-row>
             <v-row>
               <v-text-field
@@ -165,85 +165,244 @@
 </template>
 
 <script>
-  // from the Sonify Plugin we can use the WebAudio API for detailed in-browser
-  // control over audio playback.
-  export default {
-    methods: {
-      handleSonifyClick() {
-        // multipurpose function on click - this writes to the browser JS console
-        console.log('Run Sonify Cube...')
-        if (!this.audioContext) {
-          console.log('Creating AudioContext...');
-          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        this.sonify_cube(); // First render sonification...
-      },
-      async loadAudio() {
-        try {
-          // Once sonified cube is rendered, for now just play coin sound as an affirmation
-          // this sound is now being rendered by the browser (not streamed to a sound device by
-          // python) so should be possible on platforms.
-          console.log('New audio data incoming...')
-          const onAudioArrayBuffer = this.on_audio_data_str.buffer;
-          this.onAudioBuffer = await this.audioContext.decodeAudioData(onAudioArrayBuffer);
-
-          if (this.cube_audio_data_str) {
-            const cubeAudioArrayBuffer = this.cube_audio_data_str.buffer;
-            this.cubeAudioBuffer1 = await this.audioContext.decodeAudioData(cubeAudioArrayBuffer);
-            this.cubeAudioBuffer2 = await this.audioContext.decodeAudioData(cubeAudioArrayBuffer);
-          }
-
-          // 1. Create a GainNode to control volume
-          const gainNode = this.audioContext.createGain();
-          gainNode.gain.value = 0.5; 
-          gainNode.connect(this.audioContext.destination);
-          
-          this.sourceNode1 = this.audioContext.createBufferSource();
-          this.sourceNode1.buffer = this.onAudioBuffer;
-          this.sourceNode1.connect(gainNode);
-          this.sourceNode1.start(0);
-        } catch (error) {
-            console.error('Audio load error:', error);
-            throw error;
-        }
-      }
+// Tone.js is loaded dynamically in the mounted() hook
+export default {
+    data() {
+	return {
+            // Tone.js objects
+            player1: null,
+            player2: null,
+            panner1: null,
+            panner2: null,
+            crossFade: null,
+            activePlayer: 1, // 1 or 2
+            isFading: false,
+            lindxLatest: null,
+            toneJsLoadPromise: null,
+            loopDuration: null,
+	}
     },
-      
+    mounted() {
+	this.toneJsLoadPromise = new Promise((resolve, reject) => {
+            if (window.Tone) {
+		console.log('Tone.js already loaded.');
+		console.log("Tone.context.lookAhead = ", Tone.context.lookAhead, " s");
+		console.log("Tone.context.updateInterval = ", Tone.context.updateInterval, " s");
+		return resolve();
+            }
+            console.log('Loading Tone.js...');
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js';
+            script.onload = () => {
+		console.log('Tone.js loaded successfully.');
+		console.log("Tone.context.lookAhead = ", Tone.context.lookAhead, " s");
+		console.log("Tone.context.updateInterval = ", Tone.context.updateInterval, " s");
+		resolve();
+            };
+            script.onerror = (error) => {
+		console.error('Failed to load Tone.js.', error);
+		reject(error);
+            };
+            document.head.appendChild(script);
+	});
+    },
+    beforeDestroy() {
+        // Stop transport and clean up Tone.js objects
+        if (window.Tone && Tone.Transport.state === 'started') {
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+        }
+        if (this.player1) this.player1.dispose();
+        if (this.player2) this.player2.dispose();
+        if (this.panner1) this.panner1.dispose();
+        if (this.panner2) this.panner2.dispose();
+        if (this.crossFade) this.crossFade.dispose();
+    },
+    methods: {
+	handleSonifyClick() {
+            console.log('Run Sonify Cube...')
+            this.sonify_cube(); 
+	},
+	async loadAudio() {
+            try {
+		// Wait for Tone.js to be loaded
+		await this.toneJsLoadPromise;
+		
+		// Ensure Tone.js is started
+		if (Tone.context.state !== 'running') {
+		    await Tone.start();
+		    console.log('AudioContext started');
+		}
+		
+		console.log('New audio data incoming...');
+		
+		// --- Handle one-shot audio with Tone.Player ---
+		const onAudioBuffer = await new Tone.Buffer().load(this.on_audio_data_url);
+		const oneShotPlayer = new Tone.Player(onAudioBuffer).toDestination();
+		oneShotPlayer.volume.value = 0; // 0dB to not redline anything
+		oneShotPlayer.start();
+		
+		// --- Pre-load and pre-route looping cube audio with Tone.js ---
+		if (this.cube_audio_data && !this.player1) {
+		    console.log('Setting up looping sources with Tone.js...');
+		    const cubeAudioBuffer = await new Tone.Buffer().load(this.cube_audio_data_url);
+
+		    // Gotta go fast! (minimise audio latency)
+		    Tone.context.lookAhead = 0;
+		    
+		    // Create two players for the same audio buffer to allow smooth seeking and switching
+		    this.player1 = new Tone.Player(cubeAudioBuffer);
+		    this.player2 = new Tone.Player(cubeAudioBuffer);
+		    
+                    // Create panners for stereo separation (debugging)
+                    this.panner1 = new Tone.Panner(0); // Hard left
+                    this.panner2 = new Tone.Panner(0);  // Hard right
+		    
+		    // Create the crossfade and connect the players
+		    this.crossFade = new Tone.CrossFade().toDestination();
+		    this.player1.connect(this.panner1);
+                    this.panner1.connect(this.crossFade.a);
+		    this.player2.connect(this.panner2);
+                    this.panner2.connect(this.crossFade.b);
+		    
+		    // Set initial state: only player1 is audible
+		    this.crossFade.fade.value = 0;
+		    this.player1.volume.value = 0; // Set target volume
+		    this.player2.volume.value = 0;
+		    
+		    // Calculate and store the precise loop duration.
+                    this.loopDuration = this.nsamps / this.sample_rate;
+		    
+                    this.player1.loopStart = 600 * this.loopDuration; // Custom property to store offset
+                    this.player2.loopStart = 600 * this.loopDuration;
+		    this.player1.loopEnd = 601 * this.loopDuration; // Custom property to store offset
+                    this.player2.loopEnd = 601 * this.loopDuration;
+                    this.player1.loop = true;
+                    this.player2.loop = true;
+		    // this.player1.start();
+                    // this.player2.start();
+		    // Make sure the transport is running for scheduling
+		    if (Tone.Transport.state !== 'started') {
+			Tone.Transport.start();
+		    }
+
+		    // initialise it watching for lindx
+		    this.is_playing = true;
+		}
+            } catch (error) {
+		console.error('Audio load error:', error);
+		throw error;
+            }
+	},
+        handleFadeComplete(fadeInitiatedAt) {
+            this.isFading = false;
+            // If a new lindx value came in while the fade was happening,
+            // trigger a new fade to that latest value.
+            if (this.lindxLatest !== null && this.lindxLatest !== fadeInitiatedAt) {
+                this.handleLindxChange(this.lindxLatest, fadeInitiatedAt);
+            } else {
+                this.lindxLatest = null;
+            }
+        },
+        handleLindxChange(newVal, oldVal) {
+
+	    // are we ready to start playback?
+            if (!this.player1 || !this.player2 || newVal === oldVal || !window.Tone || !this.is_playing) {
+                return;
+            }
+
+	    // is this a sanctioned lindx value?
+	    if(newVal > (this.npix-1) || newVal < 0) {
+		return;
+	    }
+	    
+            // If a fade is already in progress, queue the latest value and exit.
+            if (this.isFading) {
+                this.lindxLatest = newVal;
+                return;
+            }
+	    
+            this.isFading = true;
+            this.lindxLatest = null; // Reset latest since we are processing it now
+	    
+            const fadeTime = Tone.context.updateInterval; // 30ms crossfade would be ideal, but leads to dropouts
+            const loopDuration = this.loopDuration;
+            const bufferDuration = this.player1.buffer.duration;
+	    
+            // Determine which player is inactive and update its loop points.
+            const playerToUpdate = this.activePlayer === 1 ? this.player2 : this.player1;
+            
+            // To combat floating point precision errors when converting from a sample index
+            // to a time in seconds.
+            const startsamp = (newVal * this.nsamps);
+            let newLoopStart = startsamp / this.sample_rate;
+	    
+            playerToUpdate.loopStart = newLoopStart;
+            playerToUpdate.loopEnd = newLoopStart + this.loopDuration;
+	    
+            // Restart the player at the new offset to apply the new loop points immediately.
+            // Calling .start() on a playing source is the correct way to re-trigger it.
+            playerToUpdate.start(); //(Tone.now(), newLoopStart);
+	    
+            // Determine the target for the crossfade (0 for player1, 1 for player2)
+            const rampTarget = this.activePlayer === 1 ? 1 : 0;
+
+            // Immediately start the linear ramp on the crossfade
+            this.crossFade.fade.linearRampTo(rampTarget, fadeTime, Tone.now());
+	    
+            // // Switch the active player
+            this.activePlayer = this.activePlayer === 1 ? 2 : 1;
+	    
+	    // Schedule the completion handler using Tone.js's clock for sync
+	    Tone.Draw.schedule(() => {
+		// This callback is now running in sync with the audio thread		
+		this.handleFadeComplete(newVal);
+	    }, Tone.now() + fadeTime +0.1);
+
+        }
+    },
+    
     watch: {
 	on_audio_data(newVal) {
             if (newVal) {
 		this.loadAudio();
             }
 	},
-	x_pos(newVal) {
-            console.log("x_pos changed:", newVal);
+	lindx(newVal, oldVal) {
+            this.handleLindxChange(newVal, oldVal);
 	},
-	y_pos(newVal) {
-            console.log("y_pos changed:", newVal);
-	},
+	is_playing(newVal) {
+
+	    // are we ready to start playback?
+            if (!this.player1 || !this.player2 || !window.Tone || this.is_playing == null) {
+                return;
+	    }
+
+	    console.log("this.is_playing = ", newVal);
+	    const playerToUpdate = this.activePlayer === 1 ? this.player2 : this.player1;	    
+	    if (newVal) {
+		playerToUpdate.start();
+	    } else {
+		this.player1.stop();
+                this.player2.stop();
+		this.player2.lindx = -1;
+	    }
+	}
     },
     computed: {
-      on_audio_data_str() {
-        const binary_string = window.atob(this.on_audio_data);
-        const len = binary_string.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binary_string.charCodeAt(i);
-        }
-        return bytes;
+	on_audio_data_url() {
+            return "data:audio/wav;base64," + this.on_audio_data;
+	},
+	cube_audio_data_url() {
+            if (!this.cube_audio_data) {
+		return null;
+            }
+	console.log("loading cube...")
+        return "data:audio/wav;base64," + this.cube_audio_data;
       },
-      cube_audio_data_str() {
-        if (!this.cube_audio_data) {
-          return null;
-        }
-        const binary_string = window.atob(this.cube_audio_data);
-        const len = binary_string.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binary_string.charCodeAt(i);
-        }
-        return bytes;
-      }
+      // The string-to-byte conversion is no longer needed with Tone.js's loader
+      on_audio_data_str() { return null; },
+      cube_audio_data_str() { return null; }
     }
   }
 </script>

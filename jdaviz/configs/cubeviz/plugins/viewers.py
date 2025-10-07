@@ -326,7 +326,7 @@ class CubevizImageView(JdavizViewerMixin, WithSliceSelection, BqplotImageView):
         self.sonified_cube = CubeListenerData(
             clipped_arr**assidx,
             wlens,
-            duration=0.2,
+            duration=0.25,
             samplerate=sample_rate,
             buffsize=buffer_size,
             wl_unit=self.sonification_wl_unit,
