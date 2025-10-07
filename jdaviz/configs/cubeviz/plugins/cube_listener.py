@@ -196,7 +196,7 @@ class CubeListenerData:
         in class attributes
         """
         lo2hi = self.wlens.argsort()[::-1]
-        
+
         t0 = time.time()
         for i in range(self.cube.shape[0]):
             for j in range(self.cube.shape[1]):
