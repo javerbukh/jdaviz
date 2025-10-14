@@ -26,7 +26,7 @@ except ImportError:
     _has_strauss = False
 try:
     import sounddevice as sd
-except ImportError:
+except (ImportError, OSError):
 
     class Empty:
         pass
@@ -34,7 +34,8 @@ except ImportError:
     sd = Empty()
     sd.default = Empty()
     sd.default.device = [-1, -1]
-
+    sd.query_devices = lambda: []
+    
 # TODO: create this directory for stock sounds?
 SOUND_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "..", "data", "sounds"

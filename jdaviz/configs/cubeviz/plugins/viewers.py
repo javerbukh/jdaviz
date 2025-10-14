@@ -31,7 +31,7 @@ try:
 
     if sd.default.device["output"] < 0:
         _has_sound = False
-except ImportError:
+except (ImportError, OSError):
     _has_sound = False
 if not _has_sound:
 
