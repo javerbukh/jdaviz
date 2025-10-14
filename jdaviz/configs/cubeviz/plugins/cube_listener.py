@@ -8,13 +8,13 @@ try:
     from strauss.sonification import Sonification
     from strauss.sources import Events
     from strauss.score import Score
-    from strauss.generator import Spectralizer
+    from strauss.generator import Spectralizer, Synthesizer
 except ImportError:
     pass
 
 #  smallest fraction of the max audio amplitude that can be represented by a 16-bit signed integer
 INT_MAX = 2**15 - 1
-MINVOL = 1/INT_MAX
+MINVOL = 1 / INT_MAX
 
 
 @contextmanager
@@ -28,25 +28,85 @@ def suppress_stderr():
             sys.stderr = old_stderr
 
 
-def sonify_spectrum(spec, duration, overlap=0.05, system='mono', srate=44100, fmin=40, fmax=1300,
-                    eln=False):
+def make_notification_sounds(srate=44100, duration=0.5):
+    # fifth interval - commonly evokes 'ready'
+    notes = [["E3", "B3", "E4"]]
+    score = Score(notes, duration)
+    generator = Synthesizer(samprate=srate)
+
+    generator.load_preset("pitch_mapper")
+
+    # play interval in sequence
+    data_on = {"time": [0, 0.2, 0.4], "pitch": [0, 1, 2]}
+    data_off = {"time": [0.4, 0.2, 0.0], "pitch": [0, 1, 2]}
+    lims = {"time": (0, 1)}
+    generator.modify_preset(
+        {
+            "note_length": 1,
+            "filter": "on",
+            "cutoff": 0.6,
+            "volume_envelope": {"use": "on", "A": 0.02, "D": 0.2, "S": 0},
+        }
+    )
+    # set up source
+    sources_on = Events(data_on.keys())
+    sources_on.fromdict(data_on)
+    sources_on.apply_mapping_functions(map_lims=lims)
+
+    sources_off = Events(data_off.keys())
+    sources_off.fromdict(data_off)
+    sources_off.apply_mapping_functions(map_lims=lims)
+
+    # render and play sonification!
+    on = Sonification(score, sources_on, generator, "mono", samprate=srate)
+    off = Sonification(score, sources_off, generator, "mono", samprate=srate)
+    on.render()
+    off.render()
+
+    notif_audio = {
+        "on": on.out_channels["0"].values,
+        "off": off.out_channels["0"].values,
+    }
+
+    for k in notif_audio.keys():
+        sig = notif_audio[k]
+        notif_audio[k] = (INT_MAX * sig / abs(sig).max()).astype("int16")
+    print("made notifications...")
+    return notif_audio
+
+
+def sonify_spectrum(
+    spec,
+    duration,
+    overlap=0.05,
+    system="mono",
+    srate=44100,
+    fmin=40,
+    fmax=1300,
+    eln=False,
+):
     notes = [["A2"]]
     score = Score(notes, duration)
     # set up spectralizer generator
     generator = Spectralizer(samprate=srate)
 
     # Lets pick the mapping frequency range for the spectrum...
-    generator.modify_preset({'min_freq': fmin, 'max_freq': fmax,
-                             'fit_spec_multiples': False,
-                             'interpolation_type': 'preserve_power',
-                             'equal_loudness_normalisation': eln})
+    generator.modify_preset(
+        {
+            "min_freq": fmin,
+            "max_freq": fmax,
+            "fit_spec_multiples": False,
+            "interpolation_type": "preserve_power",
+            "equal_loudness_normalisation": eln,
+        }
+    )
 
-    data = {'spectrum': [spec], 'pitch': [1]}
+    data = {"spectrum": [spec], "pitch": [1]}
 
     # set range in spectral flux representing the maximum and minimum sound frequency power:
     # 0 (numeric): absolute 0 in flux units, such that any flux above 0 will sound.
-    # '100' (string): 100th percentile (i.e. maximum value) in spectral flux.
-    lims = {'spectrum': (0, '%100')}
+    # '100' (string): 100th percntile (i.e. maximum value) in spectral flux.
+    lims = {"spectrum": (0, "100%")}
 
     # set up source
     sources = Events(data.keys())
@@ -58,30 +118,46 @@ def sonify_spectrum(spec, duration, overlap=0.05, system='mono', srate=44100, fm
     soni.render()
     soni._make_seamless(overlap)
 
-    return soni.loop_channels['0'].values
+    return soni.loop_channels["0"].values
 
 
 class CubeListenerData:
-    def __init__(self, cube, wlens, samplerate=44100, duration=1, overlap=0.05, buffsize=1024,
-                 bdepth=16, wl_unit=None, audfrqmin=50, audfrqmax=1500, eln=False, vol=None):
-        self.siglen = int(samplerate*(duration-overlap))
+    def __init__(
+        self,
+        cube,
+        wlens,
+        samplerate=44100,
+        duration=1,
+        overlap=0.05,
+        buffsize=1024,
+        bdepth=16,
+        wl_unit=None,
+        audfrqmin=50,
+        audfrqmax=1500,
+        eln=False,
+        vol=None,
+    ):
+        self.siglen = int(samplerate * (duration - overlap))
         self.cube = cube
         self.dur = duration
         self.bdepth = bdepth
         self.srate = samplerate
-        self.maxval = pow(2, bdepth-1) - 1
+        self.maxval = pow(2, bdepth - 1) - 1
         self.fadedx = 0
+
+        # generate notification audio
+        self.notification_sounds = make_notification_sounds(srate=44100, duration=0.5)
 
         if vol is None:
             self.atten_level = 1
         else:
-            self.atten_level = int(np.clip((vol/100)**2, MINVOL, 1))
+            self.atten_level = int(np.clip((vol / 100) ** 2, MINVOL, 1))
 
         self.wl_unit = wl_unit
         self.wlens = wlens
 
         # control fades
-        fade = np.linspace(0, 1, buffsize+1)
+        fade = np.linspace(0, 1, buffsize + 1)
         self.ifade = fade[:-1]
         self.ofade = fade[::-1][:-1]
 
@@ -94,15 +170,18 @@ class CubeListenerData:
 
         self.idx1 = 0
         self.idx2 = 0
+        self.lindx = 0
         self.cbuff = False
-        self.cursig = np.zeros(self.siglen, dtype='int16')
-        self.newsig = np.zeros(self.siglen, dtype='int16')
+        self.cursig = np.zeros(self.siglen, dtype="int16")
+        self.newsig = np.zeros(self.siglen, dtype="int16")
 
+        print(self.cube[:, :, 0].size * self.siglen * 2 * pow(1024, -2))
         # ensure sigcube isn't too big before we initialise it
         if self.cube[:, :, 0].size * self.siglen * 2 * pow(1024, -3) > 2:
             raise Exception("Cube projected to be > 2Gb!")
 
-        self.sigcube = np.zeros((*self.cube.shape[:2], self.siglen), dtype='int16')
+        self.sigcube = np.zeros((*self.cube.shape[:2], self.siglen), dtype="int16")
+        self.sigcube_mask = np.zeros((*self.cube.shape[:2],), dtype="bool")
 
     def set_wl_bounds(self, w1, w2):
         """
@@ -123,28 +202,37 @@ class CubeListenerData:
             for j in range(self.cube.shape[1]):
                 with suppress_stderr():
                     if self.cube[i, j, lo2hi].any():
-                        sig = sonify_spectrum(self.cube[i, j, lo2hi], self.dur,
-                                              srate=self.srate,
-                                              fmin=self.audfrqmin,
-                                              fmax=self.audfrqmax,
-                                              eln=self.eln)
-                        sig = (sig*self.maxval).astype('int16')
+                        sig = sonify_spectrum(
+                            self.cube[i, j, lo2hi],
+                            self.dur,
+                            srate=self.srate,
+                            fmin=self.audfrqmin,
+                            fmax=self.audfrqmax,
+                            eln=self.eln,
+                        )
+                        sig = (sig * self.maxval).astype("int16")
                         self.sigcube[i, j, :] = sig
+                        self.sigcube_mask[i, j] = True
                     else:
+                        self.sigcube_mask[i, j] = False
                         continue
         self.cursig[:] = self.sigcube[self.idx1, self.idx2, :]
         self.newsig[:] = self.cursig[:]
         t1 = time.time()
-        print(f"Took {t1-t0}s to process {self.cube.shape[0]*self.cube.shape[1]} spaxels")
+        print(
+            f"Took {t1-t0}s to process {self.cube.shape[0]*self.cube.shape[1]} spaxels for "
+            f"{self.cube.shape[0]*self.cube.shape[1]*self.sigcube.shape[-1] * 2*pow(1024, -2)} Mb"
+            f" ({self.sigcube.shape[0]}x{self.sigcube.shape[1]}x{self.sigcube.shape[-1]})"
+        )
 
     def player_callback(self, outdata, frames, time, status):
         cur = self.cursig
         new = self.newsig
-        sdx = int(time.outputBufferDacTime*self.srate)
-        dxs = np.arange(sdx, sdx+frames).astype(int) % self.sigcube.shape[-1]
+        sdx = int(time.outputBufferDacTime * self.srate)
+        dxs = np.arange(sdx, sdx + frames).astype(int) % self.sigcube.shape[-1]
         if self.cbuff:
-            outdata[:, 0] = (cur[dxs] * self.ofade).astype('int16')
-            outdata[:, 0] += (new[dxs] * self.ifade).astype('int16')
+            outdata[:, 0] = (cur[dxs] * self.ofade).astype("int16")
+            outdata[:, 0] += (new[dxs] * self.ifade).astype("int16")
             self.cursig[:] = self.newsig[:]
             self.cbuff = False
         else:
