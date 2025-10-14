@@ -14,6 +14,10 @@
       To use Sonify Data, install strauss and restart Jdaviz. You can do this by running pip install strauss
       in the command line and then launching Jdaviz.
     </v-alert>
+    <v-row v-if="has_strauss && !has_outs">
+      <j-docs-link>Sonification on platforms is under construction, and will be silent for now.</j-docs-link>
+    </v-row>
+
     <v-row>
       <j-docs-link>Choose the input cube, spectral subset and any advanced sonification options.</j-docs-link>
     </v-row>
@@ -137,23 +141,73 @@
         Overall Volume
         <glue-throttled-slider label="Volume" wait="300" max="100" step="1" :value.sync="volume" hide-details class="no-hint" />
     </v-row>
+    
     <j-plugin-section-header>Add Results Options</j-plugin-section-header>
-      <plugin-add-results
-          :label.sync="results_label"
-          :label_default="results_label_default"
-          :label_auto.sync="results_label_auto"
-          :label_invalid_msg="results_label_invalid_msg"
-          :label_overwrite="results_label_overwrite"
-          label_hint="Label for the sonified data"
-          :add_to_viewer_items="add_to_viewer_items"
-          :add_to_viewer_selected.sync="add_to_viewer_selected"
-          :add_to_viewer_enabled="false"
-          action_label="Sonify data"
-          action_tooltip="Create sonified data and add to flux viewer"
-          :action_spinner="spinner"
-          action_api_hint='plg.sonify_cube()'
-          :add_to_viewer_disabled="true"
-          @click:action="sonify_cube"
-      ></plugin-add-results>
+    <v-row>
+    </v-row>
+      <plugin-action-button
+        :spinner="spinner"
+        @click="handleSonifyClick"
+      > Sonify Data
+      </plugin-action-button>
  </j-tray-plugin>
 </template>
+
+<script>
+  // from the Sonify Plugin we can use the WebAudio API for detailed in-browser
+  // control over audio playback.
+  export default {
+    methods: {
+      handleSonifyClick() {
+        // multipurpose function on click - this writes to the browser JS console
+        console.log('Run Sonify Cube...')
+        if (!this.audioContext) {
+          console.log('Creating AudioContext...');
+          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        this.sonify_cube(); // First render sonification...
+      },
+      async loadAudio() {
+        try {
+          // Once sonified cube is rendered, for now just play coin sound as an affirmation
+          // this sound is now being rendered by the browser (not streamed to a sound device by
+          // python) so should be possible on platforms.
+          console.log('New audio data incoming...')
+          const arrayBuffer = this.sonified_audio_data_str.buffer;
+          this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+          // 1. Create a GainNode to control volume
+          const gainNode = this.audioContext.createGain();
+          gainNode.gain.value = 0.5; 
+          gainNode.connect(this.audioContext.destination);
+          
+          this.sourceNode = this.audioContext.createBufferSource();
+          this.sourceNode.buffer = this.audioBuffer;
+          this.sourceNode.connect(gainNode);
+          this.sourceNode.start(0);
+        } catch (error) {
+            console.error('Audio load error:', error);
+            throw error;
+        }
+      }
+    },
+    watch: {
+      sonified_audio_data(newVal) {
+        if (newVal) {
+          this.loadAudio();
+        }
+      }
+    },
+    computed: {
+      sonified_audio_data_str() {
+        const binary_string = window.atob(this.sonified_audio_data);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes;
+      }
+    }
+  }
+</script>
